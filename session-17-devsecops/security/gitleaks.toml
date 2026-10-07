@@ -1,0 +1,26 @@
+# gitleaks (secret scanning) configuration.
+# Used as: gitleaks dir . --config security/gitleaks.toml
+title = "session-17 gitleaks config"
+
+[extend]
+# Start from the built-in rules (cloud keys, GitHub tokens, private keys, generic API keys, ...).
+useDefault = true
+
+# Project rule: the app reads DEMO_API_KEY from the environment, so a literal value in the code
+# or config files is always a mistake.
+[[rules]]
+id = "s17-demo-api-key"
+description = "DEMO_API_KEY assigned a literal value"
+regex = '''(?i)demo_api_key\s*[:=]\s*["']?([a-z0-9_\-]{12,})'''
+secretGroup = 1
+keywords = ["demo_api_key"]
+
+# Documentation uses obviously fake placeholders such as "demo-not-a-real-key".
+[[allowlists]]
+description = "documented fake placeholder values"
+regexes = ['''not-a-real''']
+
+# Scanner output written by the pipeline itself is not source code.
+[[allowlists]]
+description = "generated reports"
+paths = ['''(^|/)reports/''']

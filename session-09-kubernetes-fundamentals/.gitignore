@@ -1,0 +1,3 @@
+# Nothing is built in this session; keep OS/editor noise out of git.
+.DS_Store
+*.log

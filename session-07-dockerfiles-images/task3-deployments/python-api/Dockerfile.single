@@ -1,0 +1,15 @@
+# SINGLE-STAGE version (for comparison).
+# Based on the full python:3.13 image (Debian with gcc, make, headers and many -dev
+# packages, which you need when a dependency has to be compiled). Everything used to
+# install the dependencies, including pip's download cache, stays in the final image.
+# Base image: official python:3.13 via the AWS ECR Public mirror of Docker Hub.
+FROM public.ecr.aws/docker/library/python:3.13
+
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install -r requirements.txt
+COPY app.py .
+
+ENV PYTHONUNBUFFERED=1 IMAGE_VARIANT=single-stage
+EXPOSE 5000
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--access-logfile", "-", "app:app"]

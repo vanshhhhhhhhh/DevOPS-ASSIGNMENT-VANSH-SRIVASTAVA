@@ -1,0 +1,87 @@
+# Hardened deployment of the Session 17 image.
+# Locally the image is s17-devsecops-demo:1.0.0 (loaded with `minikube image load`); in GitHub
+# Actions the deploy job renders a copy with ghcr.io/<owner>/s17-devsecops-demo:sha-<commit> (sed on the image: line).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s17-devsecops-demo
+  namespace: s17-devsecops
+  labels:
+    app.kubernetes.io/name: s17-devsecops-demo
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: s17-devsecops-demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: s17-devsecops-demo
+    spec:
+      automountServiceAccountToken: false     # the app never talks to the Kubernetes API
+      securityContext:                        # pod level
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: s17-devsecops-demo:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: DEMO_API_KEY              # optional secret, injected at runtime, never baked into the image
+              valueFrom:
+                secretKeyRef:
+                  name: s17-demo-api-key
+                  key: api-key
+                  optional: true
+          securityContext:                    # container level
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            privileged: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 2
+            failureThreshold: 15
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 2
+          volumeMounts:
+            - name: tmp                       # the only writable path besides /dev/shm
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi

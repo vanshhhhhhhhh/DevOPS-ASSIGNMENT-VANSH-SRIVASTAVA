@@ -1,0 +1,33 @@
+# Source: course repo (Nency-Ravaliya/devops-heros) session-13-storage-hpa-probes/04-hpa/deployment.yaml
+# My changes: namespace s13-hpa, a small memory request/limit (shared node), and the
+# image is pulled from the AWS ECR Public mirror of the official nginx image
+# (public.ecr.aws/docker/library/nginx:1.27 = same image as nginx:1.27) because Docker Hub
+# answered "429 Too Many Requests" from this network (see README, Environment).
+# The CPU request (100m) is the 100% reference for the HPA "averageUtilization".
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hpa-demo
+  namespace: s13-hpa
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hpa-demo
+  template:
+    metadata:
+      labels:
+        app: hpa-demo
+    spec:
+      containers:
+        - name: nginx
+          image: public.ecr.aws/docker/library/nginx:1.27
+          resources:
+            requests:
+              cpu: 100m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          ports:
+            - containerPort: 80

@@ -1,0 +1,9 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session-11-kubernetes-services (MIT).
+# Changes: none.
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-database-service
+spec:
+  type: ExternalName
+  externalName: nencyravaliya.me

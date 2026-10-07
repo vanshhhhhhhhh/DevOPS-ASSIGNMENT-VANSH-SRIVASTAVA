@@ -1,0 +1,30 @@
+# Custom Semgrep (SAST) rules for this project. The pipeline runs them together with the
+# community "p/python" ruleset:  semgrep scan --config security/semgrep.yml --config p/python app
+rules:
+  - id: s17-flask-debug-enabled
+    languages: [python]
+    severity: ERROR
+    message: Flask debug mode exposes the interactive Werkzeug debugger (remote code execution). Never enable it in a deployed app.
+    pattern-either:
+      - pattern: $APP.run(..., debug=True, ...)
+      - pattern: $APP.config["DEBUG"] = True
+
+  - id: s17-hardcoded-flask-secret-key
+    languages: [python]
+    severity: ERROR
+    message: Hard-coded Flask secret key. Read it from the environment (Kubernetes Secret / GitHub secret) instead.
+    pattern-either:
+      - pattern: $APP.secret_key = "..."
+      - pattern: $APP.config["SECRET_KEY"] = "..."
+
+  - id: s17-subprocess-shell-true
+    languages: [python]
+    severity: ERROR
+    message: subprocess call with shell=True allows shell injection. Pass an argument list instead.
+    pattern: subprocess.$FUNC(..., shell=True, ...)
+
+  - id: s17-render-template-string
+    languages: [python]
+    severity: WARNING
+    message: render_template_string() with dynamic input can lead to server-side template injection. Use template files.
+    pattern: flask.render_template_string(...)

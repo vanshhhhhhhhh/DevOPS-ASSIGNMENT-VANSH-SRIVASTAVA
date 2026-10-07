@@ -1,0 +1,27 @@
+# Routes ticketdesk-k8s.final.local through the shared ingress-nginx controller:
+# /api -> backend, everything else -> frontend.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ticketdesk
+  namespace: final-k8s
+  labels:
+    app.kubernetes.io/part-of: ticketdesk
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ticketdesk-k8s.final.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: ticketdesk-backend
+                port: { name: http }
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ticketdesk-frontend
+                port: { name: http }

@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-content
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+data:
+  # Plain-text file that is easy to check with curl.
+  version.txt: |
+    version={{ .Values.app.version }}
+    message={{ .Values.app.message }}
+    image={{ .Values.image.repository }}:{{ .Values.image.tag }}
+    replicas={{ .Values.replicaCount }}
+    renderedInRevision={{ .Release.Revision }}
+  index.html: |
+    <!doctype html>
+    <html>
+    <head><meta charset="utf-8"><title>{{ .Release.Name }} {{ .Values.app.version }}</title></head>
+    <body style="font-family: sans-serif; background: {{ .Values.app.color }}; padding: 40px;">
+      <h1>{{ .Values.app.message }}</h1>
+      <table cellpadding="6">
+        <tr><td><b>App version</b></td><td>{{ .Values.app.version }}</td></tr>
+        <tr><td><b>Image</b></td><td>{{ .Values.image.repository }}:{{ .Values.image.tag }}</td></tr>
+        <tr><td><b>Replicas</b></td><td>{{ .Values.replicaCount }}</td></tr>
+        <tr><td><b>Release</b></td><td>{{ .Release.Name }} (namespace {{ .Release.Namespace }})</td></tr>
+        <tr><td><b>Rendered in Helm revision</b></td><td>{{ .Release.Revision }}</td></tr>
+        <tr><td><b>Chart</b></td><td>{{ .Chart.Name }}-{{ .Chart.Version }}</td></tr>
+      </table>
+      <p>Session 15 - Helm rollback demo - Vansh Srivastava (24bcs10567)</p>
+    </body>
+    </html>

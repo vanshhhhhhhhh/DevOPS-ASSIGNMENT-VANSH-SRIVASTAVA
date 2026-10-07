@@ -1,0 +1,15 @@
+# Non-secret settings for the backend (read as environment variables).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticketdesk-config
+  namespace: final-k8s
+  labels:
+    app.kubernetes.io/part-of: ticketdesk
+data:
+  DB_HOST: ticketdesk-postgres
+  DB_PORT: "5432"
+  DB_NAME: ticketdesk
+  DB_USER: ticketdesk
+  ENVIRONMENT: minikube-manifests
+  LOG_LEVEL: INFO

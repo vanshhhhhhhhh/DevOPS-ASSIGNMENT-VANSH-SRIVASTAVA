@@ -1,0 +1,83 @@
+# Default values for the ticketdesk chart.
+# Environment overrides: values-minikube.yaml (local cluster), values-ci.yaml (kind in GitHub Actions).
+
+nameOverride: ""
+fullnameOverride: ""
+environment: kubernetes
+imagePullSecrets: []
+
+backend:
+  image:
+    repository: ghcr.io/vanshhhhhhhhh/ticketdesk-backend
+    tag: ""            # empty = chart appVersion; CI sets the commit SHA
+    pullPolicy: IfNotPresent
+  replicaCount: 2      # used only when autoscaling is disabled
+  logLevel: INFO
+  readinessPath: /ready
+  livenessPath: /health
+  resources:
+    requests: { cpu: 50m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+frontend:
+  image:
+    repository: ghcr.io/vanshhhhhhhhh/ticketdesk-frontend
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicaCount: 2
+  resources:
+    requests: { cpu: 10m, memory: 16Mi }
+    limits: { cpu: 200m, memory: 64Mi }
+
+postgres:
+  image:
+    repository: public.ecr.aws/docker/library/postgres
+    tag: 17-alpine
+    pullPolicy: IfNotPresent
+  database: ticketdesk
+  username: ticketdesk
+  # Demo value only. For anything real, create the Secret out-of-band and set existingSecret.
+  password: demo-password-123
+  existingSecret: ""   # name of a Secret with key DB_PASSWORD
+  storage:
+    size: 1Gi
+    storageClassName: ""   # "" = cluster default StorageClass
+  resources:
+    requests: { cpu: 50m, memory: 96Mi }
+    limits: { cpu: 500m, memory: 256Mi }
+
+ingress:
+  enabled: true
+  className: nginx
+  host: ticketdesk.local
+  annotations: {}
+  tls: []
+
+metrics:
+  # prometheus.io/* pod annotations for annotation-based scraping (used in this project).
+  podAnnotations: true
+  # For clusters running the Prometheus Operator (kube-prometheus-stack).
+  serviceMonitor:
+    enabled: false
+    interval: 15s
+    labels: {}
+  prometheusRule:
+    enabled: false
+    labels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

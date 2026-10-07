@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ticketdesk-backend
+  namespace: final-k8s
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: ticketdesk
+spec:
+  # No "replicas" here: the HorizontalPodAutoscaler (60-hpa.yaml) owns the count
+  # (minReplicas 2), so re-applying this file does not fight the HPA.
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backend
+      app.kubernetes.io/part-of: ticketdesk
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: ticketdesk
+      annotations:
+        # Prometheus (monitoring/prometheus-values.yaml) scrapes pods with these annotations.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: backend
+          image: ticketdesk-backend:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: ticketdesk-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: ticketdesk-db, key: DB_PASSWORD }
+          # startupProbe gives migrations + boot up to 60s before liveness starts counting.
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /ready, port: http }
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { cpu: 500m, memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ticketdesk-backend
+  namespace: final-k8s
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: ticketdesk
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: ticketdesk
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

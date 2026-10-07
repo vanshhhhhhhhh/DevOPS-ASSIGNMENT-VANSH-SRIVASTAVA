@@ -1,0 +1,9 @@
+# My second ExternalName Service. The course file points at nencyravaliya.me, which does not
+# resolve from this network, so I also tested with example.com (a reserved demo domain that resolves).
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-example-service
+spec:
+  type: ExternalName
+  externalName: example.com

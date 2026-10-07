@@ -1,0 +1,6 @@
+{{ .Release.Name }} (Helm revision {{ .Release.Revision }}) runs app {{ .Values.app.version }}
+with {{ .Values.image.repository }}:{{ .Values.image.tag }} and {{ .Values.replicaCount }} replica(s).
+
+Check it:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-web 18310:{{ .Values.service.port }}
+  curl http://localhost:18310/version.txt

@@ -1,0 +1,23 @@
+# hostPath (course file 01-volumes/hostpath-pod.yaml). Changes: namespace, ECR image,
+# and the node directory is /tmp/s13-hostpath-data (prefixed, the node is shared).
+# The directory lives on the node, so it outlives the Pod - but only on THIS node.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-demo
+  namespace: s13-volumes
+spec:
+  containers:
+    - name: app
+      image: public.ecr.aws/docker/library/nginx:1.27
+      volumeMounts:
+        - name: host-storage
+          mountPath: /data
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 64Mi}
+  volumes:
+    - name: host-storage
+      hostPath:
+        path: /tmp/s13-hostpath-data
+        type: DirectoryOrCreate

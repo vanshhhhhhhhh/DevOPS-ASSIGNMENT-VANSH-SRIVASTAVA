@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session 17 DevSecOps Demo</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <h1>Session 17: DevSecOps pipeline demo</h1>
+  <p class="sub">Vansh Srivastava (24bcs10567) - a notes API that is tested, scanned and gated before it ships</p>
+
+  <div class="card">
+    <h2>Pipeline</h2>
+    <ol class="flow">
+      {% for stage in stages %}<li>{{ stage }}</li>{% endfor %}
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>This running container</h2>
+    <table>
+      <tr><td>Version</td><td><code>{{ info.version }}</code></td></tr>
+      <tr><td>Git commit</td><td><code>{{ info.git_sha }}</code></td></tr>
+      <tr><td>Python</td><td><code>{{ info.python }}</code></td></tr>
+      <tr><td>Served by (hostname)</td><td><code>{{ info.hostname }}</code></td></tr>
+      <tr><td>Process UID</td><td><code>{{ info.uid }}</code> {% if info.uid != 0 %}<span class="ok">non-root</span>{% else %}<span class="bad">root</span>{% endif %}</td></tr>
+      <tr><td>App directory writable</td><td><code>{{ info.root_fs_writable }}</code> {% if not info.root_fs_writable %}<span class="ok">read-only</span>{% endif %}</td></tr>
+      <tr><td>DEMO_API_KEY configured</td><td><code>{{ info.api_key_configured }}</code> (value is never shown)</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>API</h2>
+    <ul>
+      <li><code>GET /health</code>, <code>GET /ready</code> - liveness and readiness probes</li>
+      <li><code>GET /api/info</code> - the table above as JSON</li>
+      <li><code>GET /api/notes</code>, <code>POST /api/notes {"text": "..."}</code>, <code>GET /api/notes/&lt;id&gt;</code></li>
+    </ul>
+  </div>
+</body>
+</html>

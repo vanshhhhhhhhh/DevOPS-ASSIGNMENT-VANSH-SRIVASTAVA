@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 5s        # short so the demo moves quickly (15s-60s is normal in production)
+  evaluation_interval: 5s    # how often alert rules are evaluated
+  external_labels:
+    lab: s20
+
+rule_files:
+  - /etc/prometheus/alert-rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  # Prometheus scraping itself
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # the instrumented Python app (request count, latency histogram, errors, process CPU/memory)
+  - job_name: s20-app
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["app:8000"]
+        labels:
+          service: s20-app
+
+  # cAdvisor: per-container CPU / memory from the Docker host.
+  # It sees every container on the Colima VM, so keep only the series for this stack (s20-*).
+  - job_name: cadvisor
+    static_configs:
+      - targets: ["cadvisor:8080"]
+    metric_relabel_configs:
+      - source_labels: [name]
+        regex: "s20-.*"
+        action: keep
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]

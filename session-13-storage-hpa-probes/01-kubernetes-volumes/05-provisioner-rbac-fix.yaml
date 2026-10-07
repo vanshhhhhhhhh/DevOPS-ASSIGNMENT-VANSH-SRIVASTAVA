@@ -1,0 +1,25 @@
+# Fix for the WaitForFirstConsumer problem I hit (README, Task 1, section 6):
+# minikube's storage-provisioner needs to read the Node chosen by the scheduler, but its
+# ServiceAccount is not allowed to "get nodes". This grants only that one read-only verb.
+# Cluster-scoped objects, so prefixed s13-; I deleted them again after the demo.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: s13-storage-provisioner-read-nodes
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: s13-storage-provisioner-read-nodes
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: s13-storage-provisioner-read-nodes
+subjects:
+  - kind: ServiceAccount
+    name: storage-provisioner
+    namespace: kube-system

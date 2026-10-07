@@ -1,0 +1,21 @@
+# Source: course repo (Nency-Ravaliya/devops-heros) session-13-storage-hpa-probes/mini-project/hpa.yaml
+# Change: namespace production-webapp -> s13-production-webapp (my prefix on the shared cluster).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-app-hpa
+  namespace: s13-production-webapp
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50

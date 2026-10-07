@@ -1,0 +1,27 @@
+# Copied from the course repo session-14-kubernetes-troubleshooting/09-service-dns-troubleshooting/deployment.yaml
+# Change: nginx image from the ECR Public mirror (Docker Hub rate limit). Namespace via -n s14-service.
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: web
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: web
+
+  template:
+    metadata:
+      labels:
+        app: web
+
+    spec:
+      containers:
+        - name: nginx
+          image: public.ecr.aws/docker/library/nginx:1.27
+
+          ports:
+            - containerPort: 80

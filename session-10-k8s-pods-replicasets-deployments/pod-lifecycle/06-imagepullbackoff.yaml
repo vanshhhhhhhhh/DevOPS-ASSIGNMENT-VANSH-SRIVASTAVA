@@ -1,0 +1,10 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: none.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-image-error
+spec:
+  containers:
+    - name: broken-image
+      image: jakwehrgkaejw:kahsdfgkhj

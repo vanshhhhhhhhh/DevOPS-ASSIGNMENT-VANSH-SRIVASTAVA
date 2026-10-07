@@ -1,0 +1,4 @@
+# Report folders created when system_info.sh is run inside this folder
+*_report/
+sysinfo_report/
+.DS_Store

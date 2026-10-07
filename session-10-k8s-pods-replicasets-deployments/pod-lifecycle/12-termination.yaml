@@ -1,0 +1,18 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library (AWS mirror of the same Docker Hub official image; Docker Hub returned 429 Too Many Requests).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-termination
+spec:
+  terminationGracePeriodSeconds: 20
+  containers:
+    - name: graceful-app
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          trap 'echo "SIGTERM received; cleaning up..."; sleep 10; echo "Cleanup complete"; exit 0' TERM
+          echo "Application running"
+          while true; do sleep 2; done

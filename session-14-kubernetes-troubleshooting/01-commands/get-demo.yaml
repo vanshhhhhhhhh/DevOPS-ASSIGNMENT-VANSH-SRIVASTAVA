@@ -1,0 +1,17 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/01-kubectl-get/pod.yaml.
+# Change: image pulled from the AWS ECR Public mirror of the same official image (Docker Hub
+# answered 429 Too Many Requests from this network). Namespace is given with -n s14-commands.
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: get-demo
+  labels:
+    app: get-demo
+
+spec:
+  containers:
+    - name: nginx
+      image: public.ecr.aws/docker/library/nginx:1.27
+      ports:
+        - containerPort: 80

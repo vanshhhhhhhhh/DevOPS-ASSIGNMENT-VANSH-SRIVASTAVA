@@ -1,0 +1,22 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/scenarios/scenario-4-dns-failure/broken.yaml.
+# Only change: the image registry (Docker Hub rate-limited this network). curlimages/curl is
+# also published by the curl project as quay.io/curl/curl (same image).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-4-dns-failure-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: dns-failure
+spec:
+  containers:
+    - name: client
+      image: quay.io/curl/curl:8.6.0
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Attempting connection to internal database...";
+          # BUG: Incorrect internal hostname
+          curl -s --connect-timeout 3 http://postgres-db-wrong-name.production.svc.cluster.local:5432 || true
+          echo "Process sleeping...";
+          sleep 3600

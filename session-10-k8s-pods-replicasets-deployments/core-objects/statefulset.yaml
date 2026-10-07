@@ -1,0 +1,55 @@
+# My own lightweight StatefulSet example (the course's mysql:5.7 StatefulSet is amd64-only
+# and needs 3 x 5Gi volumes, which is too heavy for the shared minikube node).
+# Shows: stable Pod names (web-sts-0, web-sts-1), ordered creation, and one PVC per Pod.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-sts
+  labels:
+    app: web-sts
+spec:
+  clusterIP: None          # headless Service required by the StatefulSet (serviceName)
+  selector:
+    app: web-sts
+  ports:
+    - name: http
+      port: 80
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web-sts
+spec:
+  serviceName: web-sts
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web-sts
+  template:
+    metadata:
+      labels:
+        app: web-sts
+    spec:
+      containers:
+        - name: nginx
+          image: public.ecr.aws/docker/library/nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: www
+              mountPath: /usr/share/nginx/html
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: www
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 16Mi

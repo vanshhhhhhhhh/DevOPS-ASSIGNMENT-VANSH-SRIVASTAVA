@@ -1,0 +1,7 @@
+# Bandit (SAST for Python) configuration.
+# Used as: bandit -c security/bandit.yaml -r app
+# Test files use plain `assert` (rule B101) and are never shipped in the image, so they are excluded.
+exclude_dirs:
+  - tests
+# No rule is skipped for application code.
+skips: []

@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+reports/
+build/
+dist/
+.venv/
+venv/
+*.tar
+*.tar.gz
+.DS_Store

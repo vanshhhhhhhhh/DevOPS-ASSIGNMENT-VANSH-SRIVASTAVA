@@ -1,0 +1,57 @@
+# The "Yatri API" client. On start it connects to Postgres with the credentials from
+# the Secret yatri-db-secret. If the login fails it exits 1 (so the pod crash-loops),
+# like a real app that cannot reach its database.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: yatri-api
+  namespace: s12-troubleshoot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: yatri-api
+  template:
+    metadata:
+      labels:
+        app: yatri-api
+    spec:
+      containers:
+        - name: api
+          image: public.ecr.aws/docker/library/postgres:16-alpine   # only used for the psql client
+          command: ["sh", "-c"]
+          args:
+            - |
+              echo "yatri-api: connecting to $PGHOST/$PGDATABASE as $PGUSER"
+              if psql -tAc "select 'connected, server time ' || now()"; then
+                echo "yatri-api: database OK, serving requests"
+                sleep infinity
+              else
+                echo "yatri-api: cannot log in to the database, exiting"
+                exit 1
+              fi
+          env:
+            - name: PGHOST
+              value: postgres
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: yatri-db-secret
+                  key: POSTGRES_USER
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: yatri-db-secret
+                  key: POSTGRES_PASSWORD
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: yatri-db-secret
+                  key: POSTGRES_DB
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

@@ -1,0 +1,14 @@
+# Extra backend settings for LocalStack, merged into backend.tf with:
+#   terraform init -backend-config=localstack.s3.tfbackend
+# (Backend blocks cannot read variables, so the switch lives in a separate file.)
+endpoints = {
+  s3       = "http://localhost:4566"
+  dynamodb = "http://localhost:4566"
+  sts      = "http://localhost:4566"
+}
+use_path_style              = true
+access_key                  = "test"
+secret_key                  = "test"
+skip_credentials_validation = true
+skip_requesting_account_id  = true
+skip_metadata_api_check     = true

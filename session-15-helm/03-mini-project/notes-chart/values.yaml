@@ -1,0 +1,24 @@
+replicaCount: 1
+
+image:
+  # Course value was "nginx". Docker Hub answered "429 Too Many Requests" on
+  # this machine, so I use the same official image from the AWS ECR Public mirror.
+  repository: public.ecr.aws/docker/library/nginx
+  tag: "1.24"
+
+service:
+  port: 80
+  nodePort: 30090
+
+app:
+  name: notes-app
+  environment: development
+
+# Added by me: small requests/limits because the minikube cluster is shared.
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

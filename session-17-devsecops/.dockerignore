@@ -1,0 +1,18 @@
+# Only requirements.txt, VERSION and app/ are needed in the build context.
+.git
+.github
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+coverage.xml
+htmlcov
+reports
+tests
+k8s
+security
+screenshots
+*.md
+.venv
+venv
+*.tar.gz

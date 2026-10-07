@@ -1,0 +1,14 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library (Docker Hub mirror); requests raised from 1 CPU/9Gi to 32 CPU/64Gi because this node has ~9.7Gi allocatable, so 9Gi could actually fit.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-pending
+spec:
+  containers:
+    - name: impossible-resource
+      image: public.ecr.aws/docker/library/nginx:1.27
+      resources:
+        requests:
+          cpu: "32"
+          memory: "64Gi"

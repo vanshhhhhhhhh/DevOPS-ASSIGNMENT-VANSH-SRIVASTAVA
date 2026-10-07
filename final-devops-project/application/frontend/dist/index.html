@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="TicketDesk - a small support-ticket tracker" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>TicketDesk</title>
+    <script type="module" crossorigin src="/assets/index-BPYfe8T5.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-D9fGm550.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo" aria-hidden="true">TD</span>
+        <div>
+          <h1>TicketDesk</h1>
+          <p class="subtitle">Support tickets for a small team</p>
+        </div>
+      </div>
+      <div class="api-status" id="api-status" title="Backend status">checking API...</div>
+    </header>
+
+    <main class="layout">
+      <section class="stats" id="stats" aria-label="Ticket counts"></section>
+
+      <section class="card form-card">
+        <h2>New ticket</h2>
+        <form id="ticket-form" autocomplete="off">
+          <label>Title<input name="title" required minlength="3" maxlength="200" placeholder="VPN drops every 10 minutes" /></label>
+          <label>Requester<input name="requester" required maxlength="120" placeholder="name@company.com" /></label>
+          <div class="row">
+            <label>Category
+              <select name="category">
+                <option>GENERAL</option><option>BILLING</option><option>TECHNICAL</option><option>ACCOUNT</option>
+              </select>
+            </label>
+            <label>Priority
+              <select name="priority">
+                <option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>URGENT</option>
+              </select>
+            </label>
+          </div>
+          <label>Description<textarea name="description" rows="3" maxlength="5000" placeholder="What happened, and what did you expect?"></textarea></label>
+          <button type="submit">Create ticket</button>
+          <p class="form-error" id="form-error" role="alert"></p>
+        </form>
+      </section>
+
+      <section class="card list-card">
+        <div class="list-header">
+          <h2>Tickets</h2>
+          <div class="filters" id="filters" role="tablist"></div>
+        </div>
+        <div id="ticket-list" class="ticket-list" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <footer class="footer">TicketDesk &middot; Session 21 final DevOps project &middot; Vansh Srivastava (24bcs10567)</footer>
+  </body>
+</html>

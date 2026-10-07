@@ -1,0 +1,21 @@
+# Remote state (optional). Copy this file to backend.tf and run:
+#   terraform init -migrate-state                                         # real AWS
+#   terraform init -migrate-state -backend-config=localstack.s3.tfbackend # LocalStack
+#
+# The bucket and the lock table must already exist (chicken-and-egg: Terraform cannot
+# store its state in a bucket that this same config creates). Create them once by hand
+# or from a tiny separate "bootstrap" Terraform config.
+terraform {
+  backend "s3" {
+    bucket  = "vansh-24bcs10567-tfstate"     # versioned + encrypted bucket that holds the state
+    key     = "session-19/terraform.tfstate" # path of the state object inside the bucket
+    region  = "ap-south-1"
+    encrypt = true
+
+    # Locking with DynamoDB: table with a string partition key named "LockID".
+    dynamodb_table = "vansh-24bcs10567-tf-locks"
+
+    # Newer alternative (Terraform >= 1.10): a lock file in the bucket itself, no DynamoDB.
+    # use_lockfile = true
+  }
+}

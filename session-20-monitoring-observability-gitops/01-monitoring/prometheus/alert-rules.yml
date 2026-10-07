@@ -1,0 +1,64 @@
+groups:
+  - name: s20-app-health
+    rules:
+      # Application health: the scrape of the app failed (container stopped / crashed / hung).
+      - alert: AppDown
+        expr: up{job="s20-app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "s20-app is down"
+          description: "Prometheus could not scrape {{ $labels.instance }} for more than 30 seconds."
+
+      # More than 5% of requests returned HTTP 5xx over the last minute.
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(app_errors_total[1m]))
+            / sum(rate(app_requests_total[1m])) > 0.05
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "s20-app error rate above 5%"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last minute."
+
+      # p95 latency above 500 ms over the last minute.
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum by (le) (rate(app_request_duration_seconds_bucket[1m]))) > 0.5
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "s20-app p95 latency above 500ms"
+          description: "p95 latency is {{ $value | humanizeDuration }}."
+
+  - name: s20-app-resources
+    rules:
+      # CPU utilisation of the app container as a fraction of its CPU limit (cAdvisor).
+      - alert: HighCPU
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total{name="s20-app"}[1m]))
+            / max(container_spec_cpu_quota{name="s20-app"} / container_spec_cpu_period{name="s20-app"})
+            > 0.8
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: "s20-app CPU above 80% of its limit"
+          description: "CPU usage is {{ $value | humanizePercentage }} of the container limit."
+
+      # Memory working set of the app container as a fraction of its memory limit (cAdvisor).
+      - alert: HighMemory
+        expr: |
+          max(container_memory_working_set_bytes{name="s20-app"})
+            / max(container_spec_memory_limit_bytes{name="s20-app"})
+            > 0.8
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "s20-app memory above 80% of its limit"
+          description: "Memory usage is {{ $value | humanizePercentage }} of the container limit."

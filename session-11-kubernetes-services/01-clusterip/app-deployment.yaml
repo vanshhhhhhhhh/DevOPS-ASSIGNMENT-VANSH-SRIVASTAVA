@@ -1,0 +1,30 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session-11-kubernetes-services (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library or quay.io/curl (same images; Docker Hub returned 429 Too Many Requests).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web-app-clusterip
+  labels:
+    app: web-clusterip
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: web-clusterip
+  template:
+    metadata:
+      labels:
+        app: web-clusterip
+    spec:
+      containers:
+        - name: nginx-web
+          image: public.ecr.aws/docker/library/nginx:1.25-alpine
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"

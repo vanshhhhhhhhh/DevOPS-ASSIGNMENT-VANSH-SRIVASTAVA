@@ -1,0 +1,15 @@
+# Trivy settings shared by the local scans and the CI image gate.
+#   trivy image --config security/trivy.yaml <image>
+# Gate: fail (exit 1) on HIGH or CRITICAL vulnerabilities that have a fix available.
+# Unfixed findings are still listed in the full JSON report uploaded by CI.
+severity:
+  - HIGH
+  - CRITICAL
+exit-code: 1
+ignorefile: security/.trivyignore
+scan:
+  scanners:
+    - vuln
+vulnerability:
+  ignore-unfixed: true
+timeout: 10m

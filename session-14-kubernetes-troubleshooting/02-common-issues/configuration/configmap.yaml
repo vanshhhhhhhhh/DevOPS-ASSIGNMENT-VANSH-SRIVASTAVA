@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: orders-config
+  namespace: s14-config
+data:
+  DATABASE_HOST: postgres.s14-config.svc.cluster.local
+  DATABASE_PORT: "5432"
+  LOG_LEVEL: info

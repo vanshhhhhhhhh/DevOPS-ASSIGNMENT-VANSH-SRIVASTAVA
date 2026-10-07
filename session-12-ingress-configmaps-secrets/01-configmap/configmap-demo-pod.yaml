@@ -1,0 +1,39 @@
+# Pod that consumes the ConfigMaps in three ways:
+#  - envFrom:       every key of yatri-app-config becomes an env variable
+#  - env.valueFrom: a single key, renamed (LOG_LEVEL -> APP_LOG_LEVEL)
+#  - volume:        every key of yatri-app-files becomes a file under /etc/config
+apiVersion: v1
+kind: Pod
+metadata:
+  name: configmap-demo
+  namespace: s12-demo
+  labels:
+    app: configmap-demo
+spec:
+  containers:
+    - name: nginx
+      image: public.ecr.aws/docker/library/nginx:1.25-alpine
+      envFrom:
+        - configMapRef:
+            name: yatri-app-config
+      env:
+        - name: APP_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: yatri-app-config
+              key: LOG_LEVEL
+      volumeMounts:
+        - name: config-files
+          mountPath: /etc/config
+          readOnly: true
+      resources:
+        requests:
+          cpu: 25m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+  volumes:
+    - name: config-files
+      configMap:
+        name: yatri-app-files

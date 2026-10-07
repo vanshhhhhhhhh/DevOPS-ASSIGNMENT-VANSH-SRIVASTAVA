@@ -1,0 +1,25 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/scenarios/scenario-5-oomkilled/broken.yaml.
+# Only change: the image registry (Docker Hub rate-limited this network). Everything else is unchanged.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-5-oomkilled-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: oomkilled
+spec:
+  containers:
+    - name: memory-leaker
+      image: public.ecr.aws/docker/library/python:3.11-alpine
+      command:
+        - "python3"
+        - "-c"
+        - |
+          # BUG: Rapidly allocates 200MB of RAM while limit is 20Mi
+          print("Allocating memory rapidly...")
+          chunks = []
+          for i in range(100):
+              chunks.append(b"x" * (10 * 1024 * 1024))
+      resources:
+        limits:
+          memory: "20Mi"

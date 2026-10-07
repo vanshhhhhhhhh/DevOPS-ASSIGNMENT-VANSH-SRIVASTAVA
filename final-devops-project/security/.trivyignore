@@ -1,0 +1,4 @@
+# Accepted risks for the Trivy gate. One CVE/GHSA id per line, each with a
+# reason and a review date. Empty on purpose: there are no accepted findings.
+# Example:
+# CVE-2099-0000  # reason: not reachable (feature X unused); review by 2027-01-31

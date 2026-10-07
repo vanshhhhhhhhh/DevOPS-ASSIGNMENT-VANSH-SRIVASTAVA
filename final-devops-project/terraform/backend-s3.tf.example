@@ -1,0 +1,12 @@
+# Remote state on real AWS (not used in the LocalStack lab). Rename to
+# backend-s3.tf and run "terraform init -migrate-state" to move the state into
+# the bucket created by this configuration, with locking in DynamoDB.
+terraform {
+  backend "s3" {
+    bucket         = "final-ticketdesk-backups-24bcs10567"
+    key            = "terraform/ticketdesk.tfstate"
+    region         = "ap-south-1"
+    dynamodb_table = "final-ticketdesk-tf-locks"
+    encrypt        = true
+  }
+}

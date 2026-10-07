@@ -1,0 +1,11 @@
+# build artefacts and local dependencies
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.class
+classes/
+target/
+.DS_Store

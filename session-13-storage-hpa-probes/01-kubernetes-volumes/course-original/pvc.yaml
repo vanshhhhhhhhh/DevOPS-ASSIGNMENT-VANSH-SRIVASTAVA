@@ -1,0 +1,12 @@
+# Course file 02-persistent-storage/pvc.yaml. Only the name and namespace changed.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: course-student-pvc
+  namespace: s13-volumes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi

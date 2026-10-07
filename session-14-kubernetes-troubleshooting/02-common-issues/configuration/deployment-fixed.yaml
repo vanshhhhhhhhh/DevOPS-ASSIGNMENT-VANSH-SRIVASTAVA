@@ -1,0 +1,39 @@
+# FIXED: the env var DB_HOST now reads the key that really exists (DATABASE_HOST).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-api
+  namespace: s14-config
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: orders-api
+  template:
+    metadata:
+      labels:
+        app: orders-api
+    spec:
+      containers:
+        - name: api
+          image: public.ecr.aws/docker/library/busybox:1.36
+          command: ["sh", "-c", "echo \"orders-api starting, db=$DB_HOST:$DB_PORT log=$LOG_LEVEL\"; sleep 3600"]
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: orders-config
+                  key: DATABASE_HOST
+            - name: DB_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: orders-config
+                  key: DATABASE_PORT
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: orders-config
+                  key: LOG_LEVEL
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 50m, memory: 32Mi}

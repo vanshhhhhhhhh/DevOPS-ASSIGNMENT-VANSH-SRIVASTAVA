@@ -1,0 +1,6 @@
+# Source: course repo (Nency-Ravaliya/devops-heros) session-13-storage-hpa-probes/mini-project/namespace.yaml
+# Change: namespace production-webapp -> s13-production-webapp (my prefix on the shared cluster).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s13-production-webapp

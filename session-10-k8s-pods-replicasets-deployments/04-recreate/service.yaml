@@ -1,0 +1,16 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: removed the fixed nodePort so Kubernetes picks a free one (shared cluster).
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-recreate-service
+  labels:
+    app: app-recreate
+spec:
+  type: NodePort
+  selector:
+    app: app-recreate
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

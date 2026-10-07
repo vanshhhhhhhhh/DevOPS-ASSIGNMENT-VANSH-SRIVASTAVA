@@ -1,0 +1,12 @@
+# Fix for the course service.yaml: the selector must match the Pod label app=web.
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service
+spec:
+  selector:
+    app: web
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

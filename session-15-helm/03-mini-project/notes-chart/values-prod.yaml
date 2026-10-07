@@ -1,0 +1,14 @@
+replicaCount: 3
+
+image:
+  # Same mirror as values.yaml (course value was "nginx").
+  repository: public.ecr.aws/docker/library/nginx
+  tag: "1.25"
+
+service:
+  port: 80
+  nodePort: 30090
+
+app:
+  name: notes-app
+  environment: production

@@ -1,0 +1,5 @@
+# packaged charts and downloaded chart archives
+*.tgz
+# helm dependency build output
+charts/*.tgz
+.DS_Store

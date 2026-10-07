@@ -1,0 +1,60 @@
+# Reproduces the course post-mortem course-troubleshooting/secret-base64-gotcha.md.
+# The database side is set up correctly: user yatri_admin with password "secretpassword"
+# (the fake demo password used in the course files).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-server-secret
+  namespace: s12-troubleshoot
+type: Opaque
+stringData:
+  POSTGRES_USER: yatri_admin
+  POSTGRES_PASSWORD: secretpassword
+  POSTGRES_DB: yatri_production_db
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: s12-troubleshoot
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: public.ecr.aws/docker/library/postgres:16-alpine
+          envFrom:
+            - secretRef:
+                name: postgres-server-secret
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "yatri_admin", "-d", "yatri_production_db"]
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: s12-troubleshoot
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

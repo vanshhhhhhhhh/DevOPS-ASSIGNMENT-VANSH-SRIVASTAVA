@@ -1,0 +1,33 @@
+# Fix (mine). Two problems in the course pod:
+#  1. The code keeps every 10 MiB chunk in a list: 100 x 10 MiB = ~1000 MiB (the comment in
+#     the course file says 200MB) against a 20Mi limit -> OOMKilled (exit 137).
+#     Raising the limit to >1 GiB would "work" but is not acceptable on a shared node, so I
+#     fixed the leak: each chunk is processed and then released.
+#  2. It is a batch job that finishes, so restartPolicy OnFailure (with Always it would be
+#     restarted after every successful run).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-5-oomkilled-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: oomkilled
+spec:
+  restartPolicy: OnFailure
+  containers:
+    - name: memory-leaker
+      image: public.ecr.aws/docker/library/python:3.11-alpine
+      command:
+        - "python3"
+        - "-c"
+        - |
+          print("Processing 100 chunks of 10 MiB, one at a time...")
+          total = 0
+          for i in range(100):
+              chunk = b"x" * (10 * 1024 * 1024)
+              total += len(chunk)
+              del chunk                      # release it before the next one
+          print(f"done, processed {total // (1024*1024)} MiB")
+      resources:
+        limits:
+          memory: "64Mi"

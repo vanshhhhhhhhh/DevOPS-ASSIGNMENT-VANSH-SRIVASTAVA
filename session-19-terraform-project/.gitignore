@@ -1,0 +1,17 @@
+# Terraform working directories and state (state can hold sensitive data)
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.DS_Store
+
+# terraform.tfvars is committed on purpose (no secrets in it).
+# .terraform.lock.hcl is committed on purpose (pins provider checksums).

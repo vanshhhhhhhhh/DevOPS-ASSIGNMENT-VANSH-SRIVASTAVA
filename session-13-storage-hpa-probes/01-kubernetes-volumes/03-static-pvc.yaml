@@ -1,0 +1,13 @@
+# Claim for the static PV (course 02-persistent-storage/pvc.yaml + storageClassName: "").
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: student-pvc
+  namespace: s13-volumes
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi

@@ -1,0 +1,18 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/scenarios/scenario-3-pending/broken.yaml.
+# Only change: the image registry (Docker Hub rate-limited this network). Everything else is unchanged.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-3-pending-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: pending
+spec:
+  containers:
+    - name: hungry-app
+      image: public.ecr.aws/docker/library/nginx:alpine
+      resources:
+        requests:
+          # BUG: Demanding 500 CPU cores ensures the pod can never be scheduled!
+          cpu: "500"
+          memory: "1000Gi"

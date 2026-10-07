@@ -1,0 +1,20 @@
+# Course 02-persistent-storage/pod.yaml (namespace + ECR image + small resources).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-demo
+  namespace: s13-volumes
+spec:
+  containers:
+    - name: app
+      image: public.ecr.aws/docker/library/nginx:1.27
+      volumeMounts:
+        - name: persistent-storage
+          mountPath: /data
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 64Mi}
+  volumes:
+    - name: persistent-storage
+      persistentVolumeClaim:
+        claimName: student-pvc

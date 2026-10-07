@@ -1,0 +1,16 @@
+# DNS debugging Pod from the official Kubernetes "Debugging DNS Resolution" guide
+# (image is multi-arch and has dig, nslookup and host).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dnsutils
+  namespace: s11-dns-client
+spec:
+  containers:
+    - name: dnsutils
+      image: registry.k8s.io/e2e-test-images/jessie-dnsutils:1.3
+      command: ["sleep", "7200"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 100m, memory: 64Mi}
+  restartPolicy: Always

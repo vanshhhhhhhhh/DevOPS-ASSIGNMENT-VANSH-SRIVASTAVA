@@ -1,0 +1,12 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library (AWS mirror of the same Docker Hub official image; Docker Hub returned 429 Too Many Requests).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: lifecycle-running
+spec:
+  containers:
+    - name: nginx
+      image: public.ecr.aws/docker/library/nginx:1.27
+      ports:
+        - containerPort: 80

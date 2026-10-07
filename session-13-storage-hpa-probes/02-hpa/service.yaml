@@ -1,0 +1,13 @@
+# Source: course repo session-13-storage-hpa-probes/04-hpa/service.yaml (namespace added)
+apiVersion: v1
+kind: Service
+metadata:
+  name: hpa-demo-service
+  namespace: s13-hpa
+spec:
+  selector:
+    app: hpa-demo
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

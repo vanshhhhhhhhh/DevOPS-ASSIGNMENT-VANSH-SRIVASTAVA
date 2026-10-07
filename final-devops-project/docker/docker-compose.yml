@@ -1,0 +1,65 @@
+# Local full stack: PostgreSQL + FastAPI backend + nginx frontend.
+#   cd final-devops-project/docker && docker compose up --build -d
+# UI:  http://localhost:8400      API: http://localhost:8401/api/docs
+# All names use the final- prefix and the 84xx host ports assigned to this project.
+name: final-ticketdesk
+
+services:
+  postgres:
+    image: public.ecr.aws/docker/library/postgres:17-alpine
+    container_name: final-ticketdesk-postgres
+    environment:
+      POSTGRES_DB: ticketdesk
+      POSTGRES_USER: ticketdesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-demo-password-123}
+    volumes:
+      - final-ticketdesk-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ticketdesk -d ticketdesk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [final-ticketdesk-net]
+
+  backend:
+    build:
+      context: ../application/backend
+      dockerfile: ../../docker/backend.Dockerfile
+    image: ticketdesk-backend:1.0.0
+    container_name: final-ticketdesk-backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ticketdesk
+      DB_USER: ticketdesk
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-demo-password-123}
+      ENVIRONMENT: docker-compose
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8401:8000"
+    networks: [final-ticketdesk-net]
+
+  frontend:
+    build:
+      context: ../application/frontend
+      dockerfile: ../../docker/frontend.Dockerfile
+    image: ticketdesk-frontend:1.0.0
+    container_name: final-ticketdesk-frontend
+    environment:
+      BACKEND_URL: http://backend:8000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8400:8080"
+    networks: [final-ticketdesk-net]
+
+volumes:
+  final-ticketdesk-pgdata:
+    name: final-ticketdesk-pgdata
+
+networks:
+  final-ticketdesk-net:
+    name: final-ticketdesk-net

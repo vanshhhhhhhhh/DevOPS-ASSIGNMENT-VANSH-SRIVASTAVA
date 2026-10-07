@@ -1,0 +1,23 @@
+# A bare ReplicaSet (no Deployment on top), used to show what a ReplicaSet does NOT do.
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: cmp-rs
+  labels:
+    app: cmp-rs
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cmp-rs
+  template:
+    metadata:
+      labels:
+        app: cmp-rs
+    spec:
+      containers:
+        - name: web
+          image: public.ecr.aws/docker/library/nginx:1.24-alpine
+          resources:
+            requests: {cpu: 20m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 64Mi}

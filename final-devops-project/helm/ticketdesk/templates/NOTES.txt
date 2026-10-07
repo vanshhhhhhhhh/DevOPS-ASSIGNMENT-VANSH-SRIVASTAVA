@@ -1,0 +1,15 @@
+TicketDesk {{ .Chart.AppVersion }} is deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Backend image:  {{ include "ticketdesk.backendImage" . }}
+Frontend image: {{ include "ticketdesk.frontendImage" . }}
+
+Open the UI with a port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "ticketdesk.fullname" . }}-frontend 8420:80
+  open http://localhost:8420   (API docs: http://localhost:8420/api/docs)
+{{- if .Values.ingress.enabled }}
+
+Through the Ingress ({{ .Values.ingress.className }}): http://{{ .Values.ingress.host }}/
+{{- end }}
+
+Run the chart's smoke test:
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}

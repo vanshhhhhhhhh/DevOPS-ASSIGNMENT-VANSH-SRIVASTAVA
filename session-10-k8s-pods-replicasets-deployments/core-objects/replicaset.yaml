@@ -1,0 +1,24 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library (AWS mirror of the same Docker Hub official image; Docker Hub returned 429 Too Many Requests).
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: yatri-backend-rs
+  labels:
+    app: yatri-backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: yatri-backend
+  template:
+    metadata:
+      labels:
+        app: yatri-backend
+    spec:
+      containers:
+        - name: backend
+          image: public.ecr.aws/docker/library/python:3.11-alpine
+          command: ["python3", "-c", "import http.server; http.server.test(HandlerClass=http.server.SimpleHTTPRequestHandler, port=5000)"]
+          ports:
+            - containerPort: 5000

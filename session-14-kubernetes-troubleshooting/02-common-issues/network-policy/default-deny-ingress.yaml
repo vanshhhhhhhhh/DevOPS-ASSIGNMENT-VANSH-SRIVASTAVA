@@ -1,0 +1,10 @@
+# The change that "broke" the app: deny all incoming traffic to every pod in the namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: s14-netpol
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress

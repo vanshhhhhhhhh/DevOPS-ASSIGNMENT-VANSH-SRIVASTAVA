@@ -1,0 +1,12 @@
+# Copied from the course repo session-14-kubernetes-troubleshooting/mini-project/broken-pod.yaml.
+# Change: image from the ECR Public mirror (Docker Hub rate limit). The tag is still wrong on purpose. Namespace given with -n s14-mini.
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: project-broken-pod
+
+spec:
+  containers:
+    - name: app
+      image: public.ecr.aws/docker/library/nginx:this-tag-does-not-exist

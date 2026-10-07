@@ -1,0 +1,25 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: image pulled from public.ecr.aws/docker/library (AWS mirror of the same Docker Hub official image; Docker Hub returned 429 Too Many Requests).
+# ==============================================================================
+# INTENTIONALLY BROKEN MANIFEST FOR IMMUTABLE SELECTOR DRILL
+# Demonstrates API server validation error when selector labels do not match pod template labels
+# ==============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: selector-error-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: correct-app-name
+  template:
+    metadata:
+      labels:
+        # BUG: Label does not match selector.matchLabels above!
+        app: wrong-app-name
+    spec:
+      containers:
+        - name: nginx
+          image: public.ecr.aws/docker/library/nginx:alpine

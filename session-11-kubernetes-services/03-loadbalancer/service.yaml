@@ -1,0 +1,17 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session-11-kubernetes-services (MIT).
+# Changes: Service port 80 -> 18120 so 'minikube tunnel' can bind it on the Mac without sudo (ports < 1024 need root).
+apiVersion: v1
+kind: Service
+metadata:
+  name: web-service-loadbalancer
+  labels:
+    app: web-loadbalancer
+spec:
+  type: LoadBalancer
+  selector:
+    app: web-loadbalancer
+  ports:
+    - name: http
+      port: 18120
+      targetPort: 80
+      protocol: TCP

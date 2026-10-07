@@ -1,0 +1,26 @@
+# Fix attempt 1 (mine): add the missing DATABASE_URL. The value is a fake demo URL.
+# Result: no more FATAL error, but the pod still restarts - see fixed.yaml / README.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-1-crashloop-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: crashloop
+spec:
+  containers:
+    - name: python-app
+      image: public.ecr.aws/docker/library/python:3.11-alpine
+      env:
+        - name: DATABASE_URL
+          value: "postgresql://demo_user@postgres-db:5432/demo_db"
+      command:
+        - "python3"
+        - "-c"
+        - |
+          import os, sys
+          db_url = os.environ.get("DATABASE_URL")
+          if not db_url:
+              print("[FATAL ERROR]: DATABASE_URL environment variable is MISSING!", file=sys.stderr)
+              sys.exit(1)
+          print("Application started successfully!")

@@ -1,0 +1,10 @@
+# Revision 3: newer nginx again, new message/colour, 3 replicas.
+replicaCount: 3
+
+image:
+  tag: "1.28-alpine"
+
+app:
+  version: v3
+  message: "Hello from version 3"
+  color: "#fef3c7"

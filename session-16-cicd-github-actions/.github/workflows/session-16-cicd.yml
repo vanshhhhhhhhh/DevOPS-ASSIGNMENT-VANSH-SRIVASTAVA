@@ -1,0 +1,277 @@
+# Session 16 - CI/CD with GitHub Actions (Vansh Srivastava, 24bcs10567)
+# GitHub only runs workflows from the repository-root .github/workflows/ folder, so this is the
+# live file. session-16-cicd-github-actions/.github/workflows/session-16-cicd.yml is a copy.
+#
+# CI = test -> build (package + Docker image)          runs on every push and pull request
+# CD = publish (delivery to GHCR) -> deploy (to kind)  runs only for main, never for pull requests
+name: "Session 16 - CI/CD Pipeline"
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "session-16-cicd-github-actions/**"
+      - ".github/workflows/session-16-cicd.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "session-16-cicd-github-actions/**"
+      - ".github/workflows/session-16-cicd.yml"
+  workflow_dispatch:
+
+# Least privilege for the automatic GITHUB_TOKEN; the publish job asks for more.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older, still-running pipeline.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  APP_DIR: session-16-cicd-github-actions
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/s16-cicd-demo
+
+defaults:
+  run:
+    shell: bash
+    working-directory: session-16-cicd-github-actions
+
+jobs:
+  # ---------------------------------------------------------------- CI: test
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Show runner details
+        run: |
+          echo "Runner: ${RUNNER_NAME} | OS: ${RUNNER_OS} | arch: ${RUNNER_ARCH}"
+          uname -a
+          echo "CPUs: $(nproc)"
+          echo "Working directory: $(pwd)"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: ${{ env.APP_DIR }}/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run unit tests with coverage
+        run: >-
+          pytest
+          --junitxml=reports/junit.xml
+          --cov=app --cov-report=term-missing
+          --cov-report=xml:reports/coverage.xml
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: s16-test-reports-py${{ matrix.python-version }}
+          path: ${{ env.APP_DIR }}/reports/
+          retention-days: 14
+
+  # --------------------------------------------------------------- CI: build
+  build:
+    name: Build and package
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Build application package
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: bash build.sh
+
+      - name: Upload application package
+        uses: actions/upload-artifact@v7
+        with:
+          name: s16-app-package
+          path: |
+            ${{ env.APP_DIR }}/build/
+            ${{ env.APP_DIR }}/dist/
+          retention-days: 14
+
+      - name: Compute image tag
+        id: meta
+        run: echo "image=${IMAGE_NAME}:sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+        run: |
+          docker build \
+            --build-arg APP_VERSION="$(cat VERSION)" \
+            --build-arg GIT_SHA="${GITHUB_SHA::7}" \
+            --tag "${IMAGE}" .
+          docker image ls "${IMAGE_NAME}"
+
+      - name: Smoke test the container
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+        run: |
+          docker run -d --name s16-smoke -p 8000:8000 "${IMAGE}"
+          for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:8000/health && break; sleep 1; done
+          echo
+          curl -fsS http://127.0.0.1:8000/api/info
+          echo
+          curl -fsS "http://127.0.0.1:8000/api/calc?op=add&a=2&b=3"
+          echo
+          docker rm -f s16-smoke
+
+      - name: Save image to a tarball
+        env:
+          IMAGE: ${{ steps.meta.outputs.image }}
+        run: docker save "${IMAGE}" | gzip > s16-image.tar.gz
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: s16-image
+          path: ${{ env.APP_DIR }}/s16-image.tar.gz
+          retention-days: 3
+
+  # ------------------------------------------------------------ secrets demo
+  secrets-demo:
+    name: Secrets demo
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Use the automatic GITHUB_TOKEN secret
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}" \
+            --jq '"Authenticated API call OK -> \(.full_name), default branch \(.default_branch)"'
+
+      - name: Use the optional DEMO_API_KEY repository secret
+        env:
+          DEMO_API_KEY: ${{ secrets.DEMO_API_KEY }}
+        run: |
+          if [ -n "${DEMO_API_KEY}" ]; then
+            echo "DEMO_API_KEY is set. Its value is masked by GitHub and never printed here."
+          else
+            echo "DEMO_API_KEY is not set - skipping. Add it under Settings > Secrets and variables > Actions."
+          fi
+
+  # ------------------------------------------- CD part 1: continuous delivery
+  publish:
+    name: Publish image to GHCR
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: s16-image
+          path: ${{ env.APP_DIR }}
+
+      - name: Load image
+        run: docker load --input s16-image.tar.gz
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image (commit tag + latest)
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          docker tag "${IMAGE}" "${IMAGE_NAME}:latest"
+          docker push "${IMAGE}"
+          docker push "${IMAGE_NAME}:latest"
+          echo "Published \`${IMAGE}\` and \`${IMAGE_NAME}:latest\`" >> "$GITHUB_STEP_SUMMARY"
+
+  # ----------------------------------------- CD part 2: continuous deployment
+  deploy:
+    name: Deploy to Kubernetes (kind)
+    needs: [build, publish]
+    # Runs after a successful publish on main, and also on manual runs (where publish is skipped).
+    if: ${{ !cancelled() && !failure() && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    environment: s16-kind-demo
+    env:
+      IMAGE: ${{ needs.build.outputs.image }}
+      NAMESPACE: s16-cicd
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v7
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: s16-image
+          path: ${{ env.APP_DIR }}
+
+      - name: Load image
+        run: docker load --input s16-image.tar.gz
+
+      - name: Create an ephemeral kind cluster
+        uses: helm/kind-action@v1.15.1
+        with:
+          cluster_name: s16-kind
+
+      - name: Load the image into the kind node
+        run: kind load docker-image "${IMAGE}" --name s16-kind
+
+      - name: Apply manifests with the new image
+        run: |
+          kubectl create namespace "${NAMESPACE}"
+          sed "s#^\( *image: \).*#\1${IMAGE}#" k8s/deployment.yaml > "${RUNNER_TEMP}/deployment.yaml"
+          grep -F "image: ${IMAGE}" "${RUNNER_TEMP}/deployment.yaml"
+          kubectl apply -n "${NAMESPACE}" -f "${RUNNER_TEMP}/deployment.yaml" -f k8s/service.yaml
+
+      - name: Wait for the rollout
+        run: kubectl -n "${NAMESPACE}" rollout status deployment/s16-cicd-demo --timeout=180s
+
+      - name: Smoke test through port-forward
+        run: |
+          kubectl -n "${NAMESPACE}" port-forward svc/s16-cicd-demo 8080:80 > "${RUNNER_TEMP}/port-forward.log" 2>&1 &
+          PF_PID=$!
+          for _ in $(seq 1 20); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
+          echo
+          curl -fsS http://127.0.0.1:8080/api/info
+          echo
+          curl -fsS "http://127.0.0.1:8080/api/calc?op=multiply&a=6&b=7"
+          echo
+          kill "${PF_PID}"
+
+      - name: Show what is running
+        if: always()
+        run: |
+          kubectl -n "${NAMESPACE}" get deployment,replicaset,pods,service -o wide
+          kubectl -n "${NAMESPACE}" get deployment s16-cicd-demo \
+            -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'

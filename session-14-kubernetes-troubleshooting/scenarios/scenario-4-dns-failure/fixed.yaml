@@ -1,0 +1,28 @@
+# Fix (mine): use the real Service name and namespace. The pattern is
+#   <service>.<namespace>.svc.cluster.local
+# The course hostname used service "postgres-db-wrong-name" in namespace "production";
+# neither exists. The database Service is postgres-db in namespace s14-triage.
+# curl is only used as a TCP reachability check: Postgres does not speak HTTP, so after a
+# successful DNS lookup and TCP connect curl reports "Empty reply from server" (exit 52)
+# instead of "Could not resolve host" (exit 6).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-4-dns-failure-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: dns-failure
+spec:
+  containers:
+    - name: client
+      image: quay.io/curl/curl:8.6.0
+      command: ["sh", "-c"]
+      args:
+        - |
+          echo "Attempting connection to internal database...";
+          curl -s --connect-timeout 3 http://postgres-db.s14-triage.svc.cluster.local:5432; echo "curl exit code: $?"
+          echo "Process sleeping...";
+          sleep 3600
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 50m, memory: 32Mi}

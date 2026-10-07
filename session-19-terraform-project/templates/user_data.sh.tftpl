@@ -1,0 +1,10 @@
+#!/bin/bash
+# Runs once, as root, on the first boot of the instance (cloud-init).
+set -euxo pipefail
+
+dnf install -y nginx
+
+# The instance profile gives this machine s3:GetObject on the site bucket, so no keys are needed.
+aws s3 cp "s3://${bucket}/index.html" /usr/share/nginx/html/index.html --region "${region}"
+
+systemctl enable --now nginx

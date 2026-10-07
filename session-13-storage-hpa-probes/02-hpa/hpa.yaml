@@ -1,0 +1,27 @@
+# Source: course repo session-13-storage-hpa-probes/04-hpa/hpa.yaml
+# Changes: namespace s13-hpa, and a "behavior" block.
+# By default the HPA waits 300 s (scaleDown stabilization window) before it removes
+# pods, so scale-in is slow on purpose (it avoids flapping). I lowered it to 60 s
+# here only so the scale-in can be observed in a short lab run.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hpa-demo
+  namespace: s13-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hpa-demo
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 50
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60

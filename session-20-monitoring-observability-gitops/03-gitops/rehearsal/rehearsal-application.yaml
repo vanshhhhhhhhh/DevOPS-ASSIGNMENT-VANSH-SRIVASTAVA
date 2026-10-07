@@ -1,0 +1,26 @@
+# Rehearsal only: same sync policy as ../argocd-application.yaml, but the source is the
+# in-cluster Helm chart repo (built from ../app) instead of GitHub, and it deploys to
+# s20-gitops-rehearsal. The finalizer makes `kubectl delete application` also delete
+# everything Argo CD created.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: s20-gitops-rehearsal
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: http://s20-chartrepo.s20-gitops-chartrepo.svc.cluster.local:8080
+    chart: s20-web
+    targetRevision: 0.1.0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: s20-gitops-rehearsal
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

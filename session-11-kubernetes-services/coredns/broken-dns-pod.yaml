@@ -1,0 +1,26 @@
+# Deliberately broken DNS config for the troubleshooting drill:
+# dnsPolicy None + a nameserver IP where nothing listens, so every lookup times out.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: broken-dns
+  namespace: s11-dns-client
+spec:
+  dnsPolicy: "None"
+  dnsConfig:
+    nameservers:
+      - 10.96.0.99
+    searches:
+      - s11-dns-client.svc.cluster.local
+      - svc.cluster.local
+      - cluster.local
+    options:
+      - name: ndots
+        value: "5"
+  containers:
+    - name: client
+      image: quay.io/curl/curl:8.5.0
+      command: ["sh", "-c", "sleep 3600"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 50m, memory: 32Mi}

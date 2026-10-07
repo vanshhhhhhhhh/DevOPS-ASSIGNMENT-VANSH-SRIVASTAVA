@@ -1,0 +1,17 @@
+# Copied unchanged from the course repo session-14-kubernetes-troubleshooting/mini-project/service.yaml.
+# Namespace given with -n s14-mini.
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: troubleshooting-service
+
+spec:
+  selector:
+    app: troubleshooting-app
+
+  ports:
+    - port: 80
+      targetPort: 80
+
+  type: ClusterIP

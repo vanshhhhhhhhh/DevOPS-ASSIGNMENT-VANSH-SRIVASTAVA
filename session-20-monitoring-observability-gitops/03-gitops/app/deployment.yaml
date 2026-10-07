@@ -1,0 +1,63 @@
+# Desired state for the GitOps demo app. Argo CD applies this file from Git;
+# do not `kubectl apply` it by hand once the Application exists.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: s20-web
+  namespace: s20-gitops-demo
+  labels:
+    app: s20-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: s20-web
+  template:
+    metadata:
+      labels:
+        app: s20-web
+    spec:
+      containers:
+        - name: web
+          # official nginx image from the AWS ECR public mirror (multi-arch, arm64 ok)
+          image: public.ecr.aws/nginx/nginx:1.27-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            # the visible version string: change it in Git, push, and Argo CD rolls it out
+            - name: APP_VERSION
+              value: "v1.0.0"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              cat > /usr/share/nginx/html/index.html <<HTML
+              <h1>Session 20 GitOps demo</h1>
+              <p>version: ${APP_VERSION}</p>
+              <p>served by pod: ${POD_NAME}</p>
+              <p>deployed by Argo CD from github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA</p>
+              HTML
+              echo "{\"version\":\"${APP_VERSION}\",\"pod\":\"${POD_NAME}\"}" > /usr/share/nginx/html/version.json
+              exec nginx -g 'daemon off;'
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /version.json
+              port: http
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /version.json
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi

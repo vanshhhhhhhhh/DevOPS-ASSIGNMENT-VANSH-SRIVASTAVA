@@ -1,0 +1,17 @@
+# Copied from the course repo session-14-kubernetes-troubleshooting/09-service-dns-troubleshooting/service.yaml
+# Unchanged. Namespace via -n s14-service.
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: web-service
+
+spec:
+  selector:
+    app: web-ahsgdf
+
+  ports:
+    - port: 80
+      targetPort: 80
+
+  type: ClusterIP

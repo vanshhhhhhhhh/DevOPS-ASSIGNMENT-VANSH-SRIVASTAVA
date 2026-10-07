@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session 16 CI/CD Demo</title>
+  <style>
+    body { font-family: -apple-system, Helvetica, Arial, sans-serif; margin: 40px; color: #1f2933; background: #f5f7fa; }
+    h1 { margin-bottom: 4px; }
+    .sub { color: #52606d; margin-top: 0; }
+    .card { background: #fff; border: 1px solid #d9e2ec; border-radius: 8px; padding: 20px 24px; margin: 20px 0; max-width: 760px; }
+    table { border-collapse: collapse; }
+    td { padding: 6px 16px 6px 0; }
+    td:first-child { color: #52606d; }
+    code { background: #eef2f7; padding: 2px 6px; border-radius: 4px; }
+    .flow span { display: inline-block; background: #2f80ed; color: #fff; padding: 6px 10px; border-radius: 4px; margin: 3px 0; }
+  </style>
+</head>
+<body>
+  <h1>Session 16: CI/CD with GitHub Actions</h1>
+  <p class="sub">Vansh Srivastava (24bcs10567) - calculator service built, tested, packaged and deployed by a pipeline</p>
+
+  <div class="card">
+    <h2>Build information</h2>
+    <table>
+      <tr><td>Application</td><td><code>{{ info.app }}</code></td></tr>
+      <tr><td>Version</td><td><code>{{ info.version }}</code></td></tr>
+      <tr><td>Git commit</td><td><code>{{ info.git_sha }}</code></td></tr>
+      <tr><td>Python</td><td><code>{{ info.python }}</code></td></tr>
+      <tr><td>Served by (hostname)</td><td><code>{{ info.hostname }}</code></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Pipeline</h2>
+    <p class="flow">
+      <span>push / PR</span> &rarr; <span>test (matrix)</span> &rarr; <span>build + package</span> &rarr;
+      <span>docker image</span> &rarr; <span>publish to GHCR</span> &rarr; <span>deploy to kind</span>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>API</h2>
+    <ul>
+      <li><code>GET /health</code> - liveness check</li>
+      <li><code>GET /api/info</code> - version and commit as JSON</li>
+      <li><code>GET /api/calc?op=add&amp;a=10&amp;b=5</code> - operations: {{ operations | join(", ") }}</li>
+    </ul>
+  </div>
+</body>
+</html>

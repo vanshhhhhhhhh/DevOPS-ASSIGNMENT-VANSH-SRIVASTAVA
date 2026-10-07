@@ -1,0 +1,43 @@
+# Path-based routing (one host, two paths). Based on the course file
+# session-12-ingress-configmaps-secrets/04-full-demo/ingress.yaml.
+# Changes: namespace s12-demo; host yatri.s12.local instead of yatri.local (the cluster
+# is shared, so I use a host name nobody else will use); and the frontend path is
+# /()(.*) instead of / (see README Task 5, issue 2: rewrite-target applies to every
+# path of the Ingress, so with a plain "/" every frontend URL was rewritten to "/").
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: yatri-ingress
+  namespace: s12-demo
+  labels:
+    app: yatri-app
+  annotations:
+    # Do not force HTTP -> HTTPS redirect (no TLS cert in this demo)
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Allow regex capture groups in path rules
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    # Strip /api prefix before forwarding to backend pods: /api/x -> /x
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: yatri.s12.local
+      http:
+        paths:
+          # /api and /api/* -> backend Python service
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: yatri-backend-service
+                port:
+                  number: 80
+          # everything else -> frontend nginx service. The empty group () makes $2 hold
+          # the rest of the path, so /50x.html is forwarded as /50x.html
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: yatri-frontend-service
+                port:
+                  number: 80

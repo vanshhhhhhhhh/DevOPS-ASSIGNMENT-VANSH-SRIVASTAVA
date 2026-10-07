@@ -1,0 +1,24 @@
+# A minimal Pod written by hand to practise the declarative workflow (kubectl apply -f).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hello-pod
+  namespace: s09-basics
+  labels:
+    app: hello
+    session: "09"
+spec:
+  containers:
+    - name: web
+      # Official nginx image, pulled from the AWS ECR Public mirror of Docker Hub
+      # (Docker Hub was rate-limiting anonymous pulls on this network).
+      image: public.ecr.aws/docker/library/nginx:1.27-alpine
+      ports:
+        - containerPort: 80
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi

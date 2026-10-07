@@ -1,0 +1,21 @@
+# Experiment for Task 4: an Ingress that asks for an IngressClass no controller owns.
+# The object is accepted by the API server (it is just data), but no controller acts on it:
+# it never gets an ADDRESS and requests for its host get the controller's 404.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: orphan-ingress
+  namespace: s12-demo
+spec:
+  ingressClassName: s12-no-such-class
+  rules:
+    - host: orphan.s12.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: yatri-frontend-service
+                port:
+                  number: 80

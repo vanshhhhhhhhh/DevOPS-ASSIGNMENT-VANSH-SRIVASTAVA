@@ -1,0 +1,5 @@
+# Files the practice commands can leave behind
+*.html
+*.pcap
+*.log
+.DS_Store

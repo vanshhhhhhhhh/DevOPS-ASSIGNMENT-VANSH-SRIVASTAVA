@@ -1,0 +1,14 @@
+# Course file 02-persistent-storage/pv.yaml. Only the name and the node path are
+# prefixed with s13- because the cluster is shared. Used to show the binding gotcha.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: s13-course-student-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: /tmp/s13-course-student-data

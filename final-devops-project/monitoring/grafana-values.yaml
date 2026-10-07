@@ -1,0 +1,67 @@
+# Grafana for the final project (chart: grafana from https://grafana-community.github.io/helm-charts;
+# the old grafana/helm-charts repo marks the chart as deprecated).
+#   kubectl -n final-monitoring create configmap final-ticketdesk-dashboard \
+#     --from-file=ticketdesk.json=monitoring/dashboards/ticketdesk-dashboard.json
+#   helm upgrade --install final-grafana grafana --repo https://grafana-community.github.io/helm-charts \
+#     --version 13.3.1 -n final-monitoring -f monitoring/grafana-values.yaml
+
+image:
+  registry: mirror.gcr.io     # Docker Hub returned 429 Too Many Requests on this machine
+  repository: grafana/grafana
+  tag: 13.2.3
+
+adminUser: admin
+adminPassword: demo-password-123   # demo only; anonymous viewers are enabled below for screenshots
+
+persistence:
+  enabled: false
+initChownData:
+  enabled: false
+testFramework:
+  enabled: false
+
+# 256Mi was OOMKilled on the first run (Grafana 13 also downloads its
+# "preinstalled" plugins at start-up; that is switched off below).
+resources:
+  requests: { cpu: 50m, memory: 160Mi }
+  limits: { cpu: 500m, memory: 384Mi }
+
+grafana.ini:
+  plugins:
+    preinstall_disabled: true
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  auth.anonymous:
+    enabled: true
+    org_role: Viewer
+  dashboards:
+    default_home_dashboard_path: /var/lib/grafana/dashboards/ticketdesk/ticketdesk.json
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://final-prometheus-server.final-monitoring.svc
+        isDefault: true
+        jsonData:
+          timeInterval: 15s
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: ticketdesk
+        folder: TicketDesk
+        type: file
+        disableDeletion: true
+        options:
+          path: /var/lib/grafana/dashboards/ticketdesk
+
+# ConfigMap created from monitoring/dashboards/ticketdesk-dashboard.json (see the command above).
+dashboardsConfigMaps:
+  ticketdesk: final-ticketdesk-dashboard

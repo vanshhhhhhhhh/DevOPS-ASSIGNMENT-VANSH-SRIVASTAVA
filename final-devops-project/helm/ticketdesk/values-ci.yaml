@@ -1,0 +1,17 @@
+# Ephemeral kind cluster in GitHub Actions. The images are built in the
+# pipeline and pushed into the kind node with "kind load docker-image";
+# the workflow sets backend.image.tag / frontend.image.tag to the commit SHA.
+environment: ci-kind
+backend:
+  image:
+    repository: ticketdesk-backend
+    pullPolicy: Never
+  autoscaling:
+    enabled: false   # kind has no metrics-server; a fixed replica count keeps the rollout simple
+  replicaCount: 2
+frontend:
+  image:
+    repository: ticketdesk-frontend
+    pullPolicy: Never
+ingress:
+  enabled: false

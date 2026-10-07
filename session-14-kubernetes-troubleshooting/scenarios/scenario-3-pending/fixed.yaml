@@ -1,0 +1,20 @@
+# Fix (mine): request what the app really needs. The node has 6 CPUs and ~10 GiB in total,
+# so 500 CPUs / 1000Gi can never fit on any node of this cluster.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-3-pending-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: pending
+spec:
+  containers:
+    - name: hungry-app
+      image: public.ecr.aws/docker/library/nginx:alpine
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "64Mi"
+        limits:
+          cpu: "200m"
+          memory: "128Mi"

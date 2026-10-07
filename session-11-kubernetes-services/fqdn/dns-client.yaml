@@ -1,0 +1,19 @@
+# Second namespace + a client Pod, used to show how Service names resolve across namespaces.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: s11-dns-client
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: dns-client
+  namespace: s11-dns-client
+spec:
+  containers:
+    - name: client
+      image: quay.io/curl/curl:8.5.0     # has curl plus busybox nslookup
+      command: ["sh", "-c", "sleep 7200"]
+      resources:
+        requests: {cpu: 10m, memory: 16Mi}
+        limits: {cpu: 100m, memory: 64Mi}

@@ -1,0 +1,22 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: removed the fixed nodePort so Kubernetes picks a free one (shared cluster).
+# service-blue.yaml — Service pointing to BLUE (v1) — LIVE traffic
+# To switch to GREEN: change selector slot: blue -> slot: green
+# OR apply service-green.yaml directly
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+  labels:
+    app: myapp
+spec:
+  type: NodePort
+  # THE SWITCH: Change this selector to switch all traffic instantly
+  selector:
+    app: myapp
+    slot: blue     # <-- Currently routing to BLUE (v1)
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

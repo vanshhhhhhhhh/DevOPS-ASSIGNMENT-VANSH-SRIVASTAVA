@@ -1,0 +1,25 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/03-kubectl-logs/pod.yaml.
+# Change: image pulled from the AWS ECR Public mirror of the same official image (Docker Hub
+# answered 429 Too Many Requests from this network). Namespace is given with -n s14-commands.
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: logs-demo
+
+spec:
+  containers:
+    - name: app
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command:
+        - sh
+        - -c
+        - |
+          echo "Application started"
+          echo "Connecting to database..."
+          echo "Database connection successful"
+          echo "Application is running"
+          while true; do
+            echo "Application is healthy"
+            sleep 5
+          done

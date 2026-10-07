@@ -1,0 +1,13 @@
+# SINGLE-STAGE version (for comparison).
+# Compiles and runs in the same full JDK image (eclipse-temurin:21-jdk, Ubuntu based),
+# so the final image contains javac, jlink, jshell, the sources and every JDK module.
+# Base image: official eclipse-temurin via the AWS ECR Public mirror of Docker Hub.
+FROM public.ecr.aws/docker/library/eclipse-temurin:21-jdk
+
+WORKDIR /app
+COPY src ./src
+RUN javac -d classes src/InfoApi.java
+
+ENV PORT=8080 IMAGE_VARIANT=single-stage
+EXPOSE 8080
+CMD ["java", "-cp", "classes", "InfoApi"]

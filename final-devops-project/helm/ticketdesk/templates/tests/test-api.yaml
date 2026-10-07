@@ -1,0 +1,37 @@
+# "helm test" pod: calls the API through the frontend Service (nginx -> backend -> PostgreSQL).
+# Uses the backend image (it has Python), so no extra image has to be pulled.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "ticketdesk.fullname" . }}-test-api
+  labels:
+    {{- include "ticketdesk.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    {{- toYaml .Values.podSecurityContext | nindent 4 }}
+    runAsUser: 10001
+  containers:
+    - name: test
+      image: {{ include "ticketdesk.backendImage" . | quote }}
+      imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+      command:
+        - python
+        - -c
+        - |
+          import json, urllib.request
+          base = "http://{{ include "ticketdesk.fullname" . }}-frontend"
+          for path in ("/api/health", "/api/tickets/stats"):
+              with urllib.request.urlopen(base + path, timeout=5) as r:
+                  print(path, r.status, json.loads(r.read()))
+                  assert r.status == 200
+          print("helm test passed")
+      resources:
+        requests: { cpu: 10m, memory: 32Mi }
+        limits: { cpu: 100m, memory: 64Mi }
+      securityContext:
+        {{- toYaml .Values.containerSecurityContext | nindent 8 }}

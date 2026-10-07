@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars to override defaults. No credentials go here:
+# the provider uses LocalStack's fake "test" keys.
+project             = "final-ticketdesk"
+environment         = "dev"
+aws_region          = "ap-south-1"
+localstack_endpoint = "http://localhost:4566"
+backup_bucket_name  = "final-ticketdesk-backups-24bcs10567"

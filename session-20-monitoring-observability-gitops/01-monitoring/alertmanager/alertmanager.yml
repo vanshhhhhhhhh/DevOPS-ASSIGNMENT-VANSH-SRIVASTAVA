@@ -1,0 +1,15 @@
+# Alertmanager groups, de-duplicates and routes the alerts Prometheus sends it.
+# For this local demo every alert goes to a small webhook receiver that just logs it
+# (a real setup would use Slack / email / PagerDuty receivers here).
+route:
+  receiver: log-webhook
+  group_by: ["alertname"]
+  group_wait: 10s
+  group_interval: 30s
+  repeat_interval: 1h
+
+receivers:
+  - name: log-webhook
+    webhook_configs:
+      - url: http://alert-receiver:5001/
+        send_resolved: true

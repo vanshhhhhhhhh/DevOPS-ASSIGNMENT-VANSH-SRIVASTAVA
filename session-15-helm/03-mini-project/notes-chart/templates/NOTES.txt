@@ -1,0 +1,7 @@
+{{ .Values.app.name }} ({{ .Values.app.environment }}) is deployed as release {{ .Release.Name }}, revision {{ .Release.Revision }}.
+Image: {{ .Values.image.repository }}:{{ .Values.image.tag }}, replicas: {{ .Values.replicaCount }}
+
+Open it from the laptop:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ .Release.Name }}-svc 18320:{{ .Values.service.port }}
+  curl http://localhost:18320/
+Inside the cluster it is also on NodePort {{ .Values.service.nodePort }}.

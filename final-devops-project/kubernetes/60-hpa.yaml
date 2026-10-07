@@ -1,0 +1,28 @@
+# Scales the backend between 2 and 5 pods on CPU (and memory) relative to the
+# container *requests*; needs metrics-server (enabled in minikube).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ticketdesk-backend
+  namespace: final-k8s
+  labels:
+    app.kubernetes.io/part-of: ticketdesk
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ticketdesk-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }
+    - type: Resource
+      resource:
+        name: memory
+        target: { type: Utilization, averageUtilization: 80 }
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 60

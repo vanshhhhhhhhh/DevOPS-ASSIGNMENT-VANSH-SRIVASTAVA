@@ -1,0 +1,23 @@
+# Added by me: a small HTML page so that I can verify each revision with curl.
+# The course chart only sets APP_NAME / ENVIRONMENT as env vars, which plain
+# nginx does not show anywhere.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-page
+  labels:
+    app: {{ .Release.Name }}
+data:
+  index.html: |
+    <!doctype html>
+    <html>
+    <head><meta charset="utf-8"><title>{{ .Values.app.name }} ({{ .Values.app.environment }})</title></head>
+    <body style="font-family: sans-serif; padding: 40px; background: {{ if eq .Values.app.environment "production" }}#fee2e2{{ else }}#e0f2fe{{ end }};">
+      <h1>{{ .Values.app.name }}</h1>
+      <p>environment: <b>{{ .Values.app.environment }}</b></p>
+      <p>image: {{ .Values.image.repository }}:{{ .Values.image.tag }}</p>
+      <p>replicas: {{ .Values.replicaCount }}</p>
+      <p>release: {{ .Release.Name }} / chart {{ .Chart.Name }}-{{ .Chart.Version }}</p>
+      <p>Session 15 mini project - Vansh Srivastava (24bcs10567)</p>
+    </body>
+    </html>

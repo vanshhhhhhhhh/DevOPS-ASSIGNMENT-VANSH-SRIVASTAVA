@@ -1,0 +1,206 @@
+# Final Troubleshooting Challenge - deliberately BROKEN deployment of TicketDesk.
+# Namespace: final-troubleshoot. Six bugs are planted (see README, section "Troubleshooting"):
+#   1. backend image tag that does not exist
+#   2. backend reads a Secret key that is not in the Secret
+#   3. readiness probe on a path the API does not serve
+#   4. backend Service selector does not match the pod labels
+#   5. Ingress sends /api to a port the Service does not expose
+#   6. HPA on a container without resource requests
+# The corrected version is ../fixed/ticketdesk-fixed.yaml.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: final-troubleshoot
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ticketdesk-config
+  namespace: final-troubleshoot
+data:
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: ticketdesk
+  DB_USER: ticketdesk
+  ENVIRONMENT: troubleshooting-lab
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ticketdesk-db
+  namespace: final-troubleshoot
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: demo-password-123
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: final-troubleshoot
+spec:
+  clusterIP: None
+  selector: { app: postgres }
+  ports:
+    - { name: postgres, port: 5432, targetPort: 5432 }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: final-troubleshoot
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: { app: postgres }
+  template:
+    metadata:
+      labels: { app: postgres }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 70, runAsGroup: 70, fsGroup: 70 }
+      containers:
+        - name: postgres
+          image: public.ecr.aws/docker/library/postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          env:
+            - { name: POSTGRES_DB, value: ticketdesk }
+            - { name: POSTGRES_USER, value: ticketdesk }
+            - name: POSTGRES_PASSWORD
+              valueFrom: { secretKeyRef: { name: ticketdesk-db, key: POSTGRES_PASSWORD } }
+            - { name: PGDATA, value: /var/lib/postgresql/data/pgdata }
+          readinessProbe:
+            exec: { command: ["pg_isready", "-U", "ticketdesk", "-d", "ticketdesk"] }
+            periodSeconds: 5
+          resources:
+            requests: { cpu: 25m, memory: 64Mi }
+            limits: { cpu: 250m, memory: 192Mi }
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+  volumeClaimTemplates:
+    - metadata: { name: data }
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources: { requests: { storage: 512Mi } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: final-troubleshoot
+spec:
+  selector:
+    matchLabels: { app: ticketdesk-backend }
+  template:
+    metadata:
+      labels: { app: ticketdesk-backend }
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+    spec:
+      containers:
+        - name: backend
+          image: ticketdesk-backend:1.0.1            # BUG 1: this tag was never built
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: ticketdesk-config }
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: ticketdesk-db, key: DB_PASSWORD }   # BUG 2: key does not exist
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+            periodSeconds: 15
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }   # BUG 3: the API serves /ready, not /readyz
+            periodSeconds: 5
+          # BUG 6: no resources.requests, but an HPA scales this Deployment on CPU %
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: final-troubleshoot
+spec:
+  selector: { app: ticketdesk-api }   # BUG 4: pods are labelled app=ticketdesk-backend
+  ports:
+    - { name: http, port: 8000, targetPort: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: final-troubleshoot
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: ticketdesk-frontend }
+  template:
+    metadata:
+      labels: { app: ticketdesk-frontend }
+    spec:
+      containers:
+        - name: frontend
+          image: ticketdesk-frontend:1.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: BACKEND_URL, value: "http://backend:8000" }
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: final-troubleshoot
+spec:
+  selector: { app: ticketdesk-frontend }
+  ports:
+    - { name: http, port: 80, targetPort: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ticketdesk
+  namespace: final-troubleshoot
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: troubleshoot.final.local
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port: { number: 8080 }   # BUG 5: the backend Service listens on 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port: { number: 80 }
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend
+  namespace: final-troubleshoot
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: backend }
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

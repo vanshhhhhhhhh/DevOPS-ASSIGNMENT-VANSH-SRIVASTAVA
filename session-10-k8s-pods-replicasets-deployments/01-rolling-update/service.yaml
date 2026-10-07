@@ -1,0 +1,17 @@
+# Source: course repo Nency-Ravaliya/devops-heros, session10-k8s-core-objects (MIT).
+# Changes: removed the fixed nodePort so Kubernetes picks a free one (shared cluster).
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-rolling-service
+  labels:
+    app: app-rolling
+spec:
+  type: NodePort
+  selector:
+    app: app-rolling
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP

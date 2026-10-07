@@ -1,0 +1,26 @@
+# The Argo CD Application: tells Argo CD WHICH Git repo/path is the desired state
+# and WHERE to deploy it. Apply this once by hand (kubectl apply -f argocd-application.yaml).
+# It lives outside app/ on purpose, so Argo CD does not try to manage its own Application.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: s20-gitops-demo
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA.git
+    targetRevision: main
+    path: session-20-monitoring-observability-gitops/03-gitops/app
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: s20-gitops-demo
+
+  syncPolicy:
+    automated:
+      prune: true      # delete cluster objects whose manifest was removed from Git
+      selfHeal: true   # undo manual changes made directly in the cluster
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,28 @@
+# Default values = revision 1 of the rollback workflow.
+replicaCount: 1
+
+image:
+  # Official nginx image from the AWS ECR Public mirror (Docker Hub returned
+  # "429 Too Many Requests" on this machine).
+  repository: public.ecr.aws/docker/library/nginx
+  tag: "1.26-alpine"
+  pullPolicy: IfNotPresent
+
+# What the page shows. Every revision changes these so the difference is visible.
+app:
+  version: v1
+  message: "Hello from version 1"
+  color: "#dbeafe"
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Small requests/limits: the minikube cluster is shared.
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 64Mi

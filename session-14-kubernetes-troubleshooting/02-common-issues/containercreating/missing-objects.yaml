@@ -1,0 +1,21 @@
+# The fix: create the objects the Pod expects (names must match exactly).
+# The "certificate" is obviously fake demo text.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: report-settings
+  namespace: s14-containercreating
+data:
+  settings.conf: |
+    report.format=pdf
+    report.schedule=daily
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: report-tls
+  namespace: s14-containercreating
+type: Opaque
+stringData:
+  tls.crt: "demo-not-a-real-certificate"
+  tls.key: "demo-not-a-real-key"

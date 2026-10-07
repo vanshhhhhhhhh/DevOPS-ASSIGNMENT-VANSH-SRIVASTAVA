@@ -1,0 +1,7 @@
+# Bandit (Python SAST) configuration, used by:
+#   bandit -c security/bandit.yaml -r application/backend/app --severity-level medium
+# Tests are excluded (they use assert by design). No checks are skipped.
+exclude_dirs:
+  - application/backend/tests
+  - application/backend/.venv
+skips: []

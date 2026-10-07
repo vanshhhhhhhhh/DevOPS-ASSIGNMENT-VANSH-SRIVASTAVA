@@ -1,0 +1,110 @@
+# Session 20 monitoring stack: instrumented app + Prometheus + Alertmanager + Grafana + cAdvisor.
+# All container / network / volume names start with "s20-". Host ports:
+#   app 8300, Prometheus 9390, Alertmanager 9393, Grafana 3300, cAdvisor 8380
+name: s20-monitoring
+
+services:
+  app:
+    build: ./app
+    image: s20-app:1.0.0
+    container_name: s20-app
+    environment:
+      APP_VERSION: "1.0.0"
+      ORDER_ERROR_RATE: "0.02"
+    ports:
+      - "8300:8000"
+    # limits make "CPU % of limit" and "memory % of limit" meaningful
+    cpus: 0.5
+    mem_limit: 256m
+    networks: [s20-net]
+    restart: "no"
+
+  prometheus:
+    image: quay.io/prometheus/prometheus:v3.5.0
+    container_name: s20-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=1d
+      - --web.enable-lifecycle
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+      - s20-prometheus-data:/prometheus
+    ports:
+      - "9390:9090"
+    networks: [s20-net]
+
+  alertmanager:
+    image: quay.io/prometheus/alertmanager:v0.28.1
+    container_name: s20-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9393:9093"
+    networks: [s20-net]
+
+  alert-receiver:
+    image: public.ecr.aws/docker/library/python:3.12-slim
+    container_name: s20-alert-receiver
+    command: ["python", "-u", "/receiver.py"]
+    volumes:
+      - ./alert-receiver/receiver.py:/receiver.py:ro
+    networks: [s20-net]
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: s20-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: demo-password-123   # local demo only
+      # Anonymous read-only access, ONLY for this local demo, so the dashboard
+      # can be opened (and screenshotted) without a login page.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/s20-app-overview.json
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - s20-grafana-data:/var/lib/grafana
+    ports:
+      - "3300:3000"
+    depends_on: [prometheus]
+    networks: [s20-net]
+
+  cadvisor:
+    image: ghcr.io/google/cadvisor:v0.57.0
+    container_name: s20-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=10s
+      - --store_container_labels=false
+      - --disable_metrics=percpu,sched,tcp,udp,disk,diskIO,hugetlb,referenced_memory,cpu_topology,resctrl,advtcp,process
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8380:8080"
+    networks: [s20-net]
+
+networks:
+  s20-net:
+    name: s20-monitoring-net
+
+volumes:
+  s20-prometheus-data:
+    name: s20-prometheus-data
+  s20-grafana-data:
+    name: s20-grafana-data

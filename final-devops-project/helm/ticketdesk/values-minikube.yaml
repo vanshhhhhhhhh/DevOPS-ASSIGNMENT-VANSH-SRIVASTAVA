@@ -1,0 +1,13 @@
+# Local minikube: images were built with docker and loaded with
+# "minikube image load", so they are referenced by their local names.
+environment: minikube-helm
+backend:
+  image:
+    repository: ticketdesk-backend
+    tag: "1.0.0"
+frontend:
+  image:
+    repository: ticketdesk-frontend
+    tag: "1.0.0"
+ingress:
+  host: ticketdesk.final.local

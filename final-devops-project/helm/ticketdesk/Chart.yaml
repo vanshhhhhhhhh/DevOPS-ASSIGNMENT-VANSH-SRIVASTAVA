@@ -1,0 +1,12 @@
+apiVersion: v2
+name: ticketdesk
+description: TicketDesk support-ticket app (FastAPI backend, nginx frontend, PostgreSQL) for the Session 21 final DevOps project
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords: [fastapi, postgresql, nginx, devops]
+maintainers:
+  - name: Vansh Srivastava (24bcs10567)
+    url: https://github.com/vanshhhhhhhhh
+sources:
+  - https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA

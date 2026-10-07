@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>s08 Frontend</title>
+</head>
+<body style="font-family: sans-serif; margin: 40px;">
+  <h1>Frontend container (s08-frontend)</h1>
+  <p>This page is served by nginx in the <b>s08-frontend</b> container on network <b>s08-frontend-net</b>.</p>
+  <p>The box below is filled by a request to <code>/api/status</code>, which nginx proxies to the
+     <b>s08-backend</b> container using Docker's built-in DNS on s08-frontend-net.</p>
+  <h2>Response from the backend:</h2>
+  <pre id="result" style="background:#f2f2f2; padding: 12px; white-space: pre-wrap;">loading...</pre>
+  <p><small>Session 08 Task 1 - Vansh Srivastava (24bcs10567)</small></p>
+  <script>
+    fetch("/api/status")
+      .then((r) => r.json())
+      .then((j) => (document.getElementById("result").textContent = JSON.stringify(j, null, 2)))
+      .catch((e) => (document.getElementById("result").textContent = "error: " + e));
+  </script>
+</body>
+</html>

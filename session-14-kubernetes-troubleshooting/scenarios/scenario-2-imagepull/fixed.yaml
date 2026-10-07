@@ -1,0 +1,16 @@
+# Fix (mine): point at an image that exists in a registry the node can reach.
+# "yatri-api-service" was never published anywhere, so I use nginx as a stand-in for the app.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-2-imagepull-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: imagepull
+spec:
+  containers:
+    - name: web-app
+      image: public.ecr.aws/docker/library/nginx:1.27
+      resources:
+        requests: {cpu: 10m, memory: 32Mi}
+        limits: {cpu: 100m, memory: 64Mi}

@@ -1,0 +1,7 @@
+*.class
+classes
+target
+Dockerfile*
+.dockerignore
+.git
+*.md

@@ -1,0 +1,31 @@
+# Gitleaks configuration for the final project.
+# CI runs it on this folder only:  gitleaks dir final-devops-project --config final-devops-project/security/.gitleaks.toml
+# (other session folders in the repo contain deliberately fake secrets used in demos).
+title = "TicketDesk gitleaks config"
+
+[extend]
+useDefault = true
+
+# Extra rule: a PostgreSQL connection string with an inline password,
+# e.g. postgresql+psycopg://user:SuperSecret@db:5432/app
+[[rules]]
+id = "postgres-url-with-password"
+description = "PostgreSQL connection URL containing a password"
+regex = '''postgres(?:ql)?(?:\+\w+)?://[^:\s/]+:([^@\s]{6,})@'''
+secretGroup = 1
+keywords = ["postgres"]
+
+  # The documented demo password and shell/compose placeholders are allowed.
+  [[rules.allowlists]]
+  regexTarget = "secret"
+  regexes = ['''^demo-password-123$''', '''^\$\{?[A-Z_]+''', '''^\{\{''']
+
+[allowlist]
+description = "Build output and dependencies are not source"
+paths = [
+  '''node_modules/''',
+  '''dist/''',
+  '''\.terraform/''',
+  '''screenshots/''',
+  '''package-lock\.json$''',
+]

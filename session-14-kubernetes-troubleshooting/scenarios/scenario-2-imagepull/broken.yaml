@@ -1,0 +1,16 @@
+# Copied from the course repo (Nency-Ravaliya/devops-heros) session-14-kubernetes-troubleshooting/scenarios/scenario-2-imagepull/broken.yaml.
+# Only change: the image registry (Docker Hub rate-limited this network). The bug is kept:
+# the repository/tag still does not exist, now on the ECR mirror, so the pull fails for the
+# real reason (not found) and not because of the Docker Hub rate limit.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fail-2-imagepull-pod
+  labels:
+    tier: triage-gauntlet
+    scenario: imagepull
+spec:
+  containers:
+    - name: web-app
+      # BUG: Typo in image name and tag
+      image: public.ecr.aws/docker/library/yatri-api-service:v999-invalid-tag-does-not-exist
