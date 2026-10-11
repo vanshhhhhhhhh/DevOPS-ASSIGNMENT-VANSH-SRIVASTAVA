@@ -1,0 +1,15 @@
+# Copied from the course repo session-14-kubernetes-troubleshooting/08-pending-pods/broken-pod.yaml
+# Change: nginx image from the ECR Public mirror. Namespace via -n s14-triage.
+apiVersion: v1
+kind: Pod
+
+metadata:
+  name: pending-demo
+
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: node-that-does-not-exist
+
+  containers:
+    - name: nginx
+      image: public.ecr.aws/docker/library/nginx:1.27

@@ -1,0 +1,4 @@
+# private kubeconfig copies (used to run the course triage script in my namespace)
+kubeconfig*
+*.log
+.DS_Store
