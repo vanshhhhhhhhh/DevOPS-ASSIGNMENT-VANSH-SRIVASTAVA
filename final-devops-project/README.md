@@ -806,7 +806,53 @@ exit code: 0
 
 ### Pipeline execution
 
-TODO-POSTPUSH: link to the first GitHub Actions run of `final-project.yml` after the push, the result of each job (build-test, sast, sca, secret-scan, image, deploy-kind), the uploaded artifacts, and the GHCR packages `ghcr.io/vanshhhhhhhhh/ticketdesk-backend:<sha>` / `ticketdesk-frontend:<sha>`.
+The first run of `final-project.yml` was triggered by the push of commit `4c9767e` to `main` on 2026-10-12: [run 38172434862](https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/38172434862). All six jobs passed on the first try, in 4m 9s.
+
+```text
+$ gh run view 38172434862 --json jobs --jq '.jobs[] | "\(.name)\t\(.conclusion)\t\(((.completedAt|fromdate)-(.startedAt|fromdate)))s"'
+Build and test	success	50s
+Secret scan (gitleaks)	success	12s
+SCA (pip-audit, npm audit, Trivy fs)	success	54s
+SAST (Bandit, Semgrep) + IaC config scan	success	37s
+Docker build, Trivy gate, push to GHCR	success	74s
+Deploy to ephemeral kind cluster (Helm) + smoke test	success	113s
+```
+
+Key lines from the job logs (`gh run view 38172434862 --log`, filtered):
+
+```text
+Build and test | TOTAL               170      1    99%
+Build and test | ============================== 15 passed in 0.52s ==============================
+Secret scan (gitleaks) | 8:29PM INF no leaks found
+SCA (pip-audit, npm audit, Trivy fs) | No known vulnerabilities found
+SCA (pip-audit, npm audit, Trivy fs) | No known vulnerabilities found
+SCA (pip-audit, npm audit, Trivy fs) | found 0 vulnerabilities
+SCA (pip-audit, npm audit, Trivy fs) | - '0': Clean (no security findings detected)
+SAST (Bandit, Semgrep) + IaC config scan | Ran 237 rules on 43 files: 0 findings.
+SAST (Bandit, Semgrep) + IaC config scan | - '0': Clean (no security findings detected)
+Docker build, Trivy gate, push to GHCR | │ ticketdesk-backend:4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8 (debian 13.7)        │   debian   │        0        │
+Docker build, Trivy gate, push to GHCR | │ ticketdesk-frontend:4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8 (alpine 3.23.4) │ alpine │        0        │
+Docker build, Trivy gate, push to GHCR | 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8: digest: sha256:d7a330e6244d5cf4f6122ccba94780375041d2abbf1715ce770706983038ba66 size: 2410
+Docker build, Trivy gate, push to GHCR | 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8: digest: sha256:13c38bf024d139330f9262c6516ba3239984232456c917d251c8f439b808cca1 size: 2823
+Deploy to ephemeral kind cluster (Helm) + smoke test | Creating cluster "final-ci" ...
+Deploy to ephemeral kind cluster (Helm) + smoke test | STATUS: deployed
+Deploy to ephemeral kind cluster (Helm) + smoke test | deployment "final-ticketdesk-backend" successfully rolled out
+Deploy to ephemeral kind cluster (Helm) + smoke test | deployment "final-ticketdesk-frontend" successfully rolled out
+Deploy to ephemeral kind cluster (Helm) + smoke test | Phase:          Succeeded
+Deploy to ephemeral kind cluster (Helm) + smoke test | {"status":"ok"}
+Deploy to ephemeral kind cluster (Helm) + smoke test | SMOKE TEST PASSED against http://localhost:8080
+```
+
+- **Build and test:** 15 tests passed against a PostgreSQL service container, with 99% coverage.
+- **Security jobs:** gitleaks found no leaks, pip-audit and npm audit found no known vulnerabilities, Trivy fs was clean, and Semgrep ran 237 rules with 0 findings.
+- **Image gate:** Trivy reported 0 vulnerabilities at the gated severities in the backend (Debian 13.7) and frontend (Alpine 3.23.4) images.
+- **Publish:** both images were pushed to GHCR as `ghcr.io/vanshhhhhhhhh/ticketdesk-backend:4c9767e...` and `ticketdesk-frontend:4c9767e...` (digests above).
+- **Deploy:** the same image tarball was loaded into a fresh kind cluster and installed with Helm. Both Deployments rolled out, `helm test` succeeded, and the smoke test passed through a port-forward.
+- **Warning:** "Docker pull failed with exit code 1, back off 2.855 seconds before retry" in Build and test. That is the runner's first pull of the Postgres service image failing; the automatic retry succeeded.
+
+Artifacts uploaded by the run (`gh api repos/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/38172434862/artifacts`): `test-reports`, `frontend-dist`, `sast-reports`, `sca-reports`, `gitleaks-report`, `trivy-image-reports` and `ticketdesk-images` (96.7 MB, the image tarball that the deploy job loads into kind).
+
+![GitHub Actions run of final-project.yml, all six jobs green](screenshots/07-actions-run.png)
 
 ## Task 7: DevSecOps implementation
 
@@ -1127,16 +1173,103 @@ The workflow pushes SHA-tagged images to GHCR, but the Application uses the loca
 
 ### GitOps sync (after the push)
 
-TODO-POSTPUSH: output of the live sync, run after the repository was pushed:
+I ran this on 2026-10-12, after the repository was pushed to `main`. The Helm release `final-ticketdesk` (revision 2) was already running in `final-app`, so this also tests Argo CD taking over a release that was installed by hand.
 
-```bash
+```text
 $ kubectl apply -f final-devops-project/gitops/argocd-application.yaml
+application.argoproj.io/final-ticketdesk created
+  02:02:07  sync/health=/
+  02:02:13  sync/health=Synced/Healthy
 $ kubectl -n argocd get application final-ticketdesk -o wide
+NAME               SYNC STATUS   HEALTH STATUS   REVISION                                   PROJECT
+final-ticketdesk   Synced        Healthy         7a1f298d89cc7cd3ef3f066876647be701605f23   default
 $ kubectl -n argocd get application final-ticketdesk -o jsonpath='{.status.sync.status} {.status.health.status} {.status.sync.revision}'
+Synced Healthy 7a1f298d89cc7cd3ef3f066876647be701605f23
+$ kubectl -n argocd get application final-ticketdesk -o jsonpath='{range .status.resources[*]}{.kind}{"	"}{.name}{"	"}{.status}{"	"}{.health.status}{"
+"}{end}'
+ConfigMap	final-ticketdesk-config	Synced	
+Secret	final-ticketdesk-db	Synced	
+Service	final-ticketdesk-backend	Synced	
+Service	final-ticketdesk-frontend	Synced	
+Service	final-ticketdesk-postgres	Synced	
+Deployment	final-ticketdesk-backend	Synced	
+Deployment	final-ticketdesk-frontend	Synced	
+StatefulSet	final-ticketdesk-postgres	Synced	
+HorizontalPodAutoscaler	final-ticketdesk-backend	Synced	
+Ingress	final-ticketdesk	Synced	
 $ kubectl -n final-app get pods
+NAME                                         READY   STATUS    RESTARTS   AGE
+final-ticketdesk-backend-6d57b84585-27dlz    1/1     Running   0          16m
+final-ticketdesk-backend-6d57b84585-2pxt9    1/1     Running   0          16m
+final-ticketdesk-backend-6d57b84585-qg87x    1/1     Running   0          16m
+final-ticketdesk-frontend-6fc4d6d548-9zxwc   1/1     Running   0          16m
+final-ticketdesk-frontend-6fc4d6d548-xsk2c   1/1     Running   0          16m
+final-ticketdesk-postgres-0                  1/1     Running   0          16m
+$ kubectl -n final-app scale deploy/final-ticketdesk-frontend --replicas=1
+deployment.apps/final-ticketdesk-frontend scaled
+  02:02:13  frontend spec.replicas=1
+  02:02:15  frontend spec.replicas=1
+  02:02:17  frontend spec.replicas=1
+  02:02:19  frontend spec.replicas=1
+  02:02:21  frontend spec.replicas=1
+  02:02:23  frontend spec.replicas=1
+  02:02:25  frontend spec.replicas=1
+  02:02:27  frontend spec.replicas=1
+  02:02:29  frontend spec.replicas=1
+  02:02:31  frontend spec.replicas=1
+  02:02:33  frontend spec.replicas=1
+  02:02:35  frontend spec.replicas=1
+  02:02:38  frontend spec.replicas=1
+  02:02:40  frontend spec.replicas=1
+  02:02:42  frontend spec.replicas=1
+  02:02:44  frontend spec.replicas=1
+  02:02:46  frontend spec.replicas=1
+  02:02:48  frontend spec.replicas=1
+  02:02:50  frontend spec.replicas=1
+  02:02:52  frontend spec.replicas=1
+$ kubectl -n final-app get deploy
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+final-ticketdesk-backend    3/3     3            3           4d2h
+final-ticketdesk-frontend   1/1     1            1           4d2h
+$ kubectl -n final-app get hpa
+NAME                       REFERENCE                             TARGETS                        MINPODS   MAXPODS   REPLICAS   AGE
+final-ticketdesk-backend   Deployment/final-ticketdesk-backend   cpu: 9%/70%, memory: 54%/80%   2         5         3          4d2h
 ```
 
-Optional self-heal demo: `kubectl -n final-app scale deploy/final-ticketdesk-frontend --replicas=1`, then watch Argo CD put it back to 2.
+Argo CD reported `Synced/Healthy` at the pushed commit within about 6 seconds, and all 10 chart objects matched Git. The self-heal test did not work, though: I scaled the frontend to 1 and it stayed at 1 for 40 seconds while Argo CD still said `Synced`.
+
+**Why.** The objects were created by `helm upgrade --install`, and Helm 4 uses server-side apply, so they carry no `kubectl.kubernetes.io/last-applied-configuration` annotation. When Argo CD adopted them, it compared and found nothing to change, so it never ran a sync operation (`operationState` was empty). Argo CD's default diff is a three-way diff that relies on that annotation. Without it, the drift in `spec.replicas` was not reported, and automated self-heal only starts when an app is OutOfSync. The fix is one explicit sync, so that Argo CD applies the objects itself and records what it applied:
+
+```text
+$ kubectl -n final-app get deploy final-ticketdesk-frontend -o jsonpath='{.metadata.annotations}'
+{"deployment.kubernetes.io/revision":"2","meta.helm.sh/release-name":"final-ticketdesk","meta.helm.sh/release-namespace":"final-app"}
+$ kubectl -n argocd get application final-ticketdesk -o jsonpath='{.status.operationState.phase}'   # empty: no sync operation has run yet
+
+$ kubectl -n argocd patch application final-ticketdesk --type merge -p '{"operation":{"initiatedBy":{"username":"vansh"},"sync":{"revision":"main","prune":true}}}'
+application.argoproj.io/final-ticketdesk patched
+  02:03:31  operation=Running
+  02:03:33  operation=Succeeded
+$ kubectl -n argocd get application final-ticketdesk -o jsonpath='{.status.operationState.message}'
+successfully synced (all tasks run)
+$ kubectl -n final-app get deploy
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+final-ticketdesk-backend    3/3     3            3           4d2h
+final-ticketdesk-frontend   1/2     2            1           4d2h
+$ kubectl -n final-app get deploy final-ticketdesk-frontend -o jsonpath='{.metadata.annotations}' | grep -o last-applied-configuration
+last-applied-configuration
+--- drift test again
+$ kubectl -n final-app scale deploy/final-ticketdesk-frontend --replicas=1
+deployment.apps/final-ticketdesk-frontend scaled
+  02:03:37  frontend spec.replicas=1   argocd sync/health=Synced/Progressing
+  02:03:39  frontend spec.replicas=2   argocd sync/health=Synced/Healthy
+$ kubectl -n final-app get deploy final-ticketdesk-frontend
+NAME                        READY   UP-TO-DATE   AVAILABLE   AGE
+final-ticketdesk-frontend   2/2     2            2           4d2h
+$ kubectl -n argocd get application final-ticketdesk -o jsonpath='{range .status.history[*]}...'
+id=0  revision=7a1f298d89cc7cd3ef3f066876647be701605f23  deployedAt=2026-10-11T20:33:32Z
+```
+
+After that one sync, Argo CD owns the objects and drift is reverted within about 2 seconds. Lesson: when moving a hand-installed Helm release under Argo CD, run one explicit sync after creating the Application (`argocd app sync final-ticketdesk`, or the `operation` patch above). The other option is server-side diff (`argocd.argoproj.io/compare-options: ServerSideDiff=true`). The backend HPA kept working throughout, because the chart leaves `replicas` out of the backend Deployment when autoscaling is enabled, so Argo CD and the HPA never fight over it.
 
 ## Task 10: Final Troubleshooting Challenge
 
@@ -1439,6 +1572,7 @@ I deleted `final-troubleshoot` after capturing this.
 | [04-grafana-dashboard.png](screenshots/04-grafana-dashboard.png) | Grafana "TicketDesk - API overview" during the load test (5 pods after HPA scale-up) |
 | [05-prometheus-targets.png](screenshots/05-prometheus-targets.png) | Prometheus target health: all backend pods UP |
 | [06-prometheus-alerts.png](screenshots/06-prometheus-alerts.png) | the five alert rules, `TicketDeskUrgentTicketSpike` firing |
+| [07-actions-run.png](screenshots/07-actions-run.png) | GitHub Actions run of `final-project.yml`, all six jobs green |
 
 All were taken with headless Chrome; 04 through `scripts/screenshot-cdp.mjs` for the reason given in Task 8.
 
