@@ -4,7 +4,7 @@
 **Enrollment No.:** 24bcs10567
 **Session:** 16
 
-This session is about automating the path from `git push` to a running application: CI (build and test every change) and CD (deliver and deploy what passed). Following the instructor's `10-final-cicd-pipeline` example, I built a small Flask calculator service with unit tests, a build script, a Dockerfile, Kubernetes manifests and one GitHub Actions workflow. The workflow tests on three Python versions, packages the app, builds and smoke-tests a Docker image, publishes it to GitHub Container Registry (GHCR) and deploys it to a throwaway Kubernetes (kind) cluster inside the runner. Everything except the GitHub run itself was run locally and the real output is below. The GitHub run gets added after the repo is pushed.
+This session is about automating the path from `git push` to a running application: CI (build and test every change) and CD (deliver and deploy what passed). Following the instructor's `10-final-cicd-pipeline` example (in `session-16-github-actions` of the course repo https://github.com/Nency-Ravaliya/devops-heros), I built a small Flask calculator service with unit tests, a build script, a Dockerfile, Kubernetes manifests and one GitHub Actions workflow. The workflow tests on three Python versions, packages the app, builds and smoke-tests a Docker image, publishes it to GitHub Container Registry (GHCR) and deploys it to a throwaway Kubernetes (kind) cluster inside the runner. I ran everything locally first (real output below). After the repo was pushed, the workflow ran on GitHub and every job passed (see "Pipeline execution").
 
 ## Folder structure
 
@@ -33,7 +33,8 @@ session-16-cicd-github-actions/
 ├── requirements-dev.txt             # + pytest, pytest-cov (pinned)
 └── screenshots/
     ├── 01-s16-app-docker.png        # app running in Docker
-    └── 02-s16-app-kubernetes.png    # app running in Kubernetes (local rehearsal of the deploy job)
+    ├── 02-s16-app-kubernetes.png    # app running in Kubernetes (local rehearsal of the deploy job)
+    └── 03-actions-run-37668580543.png  # the GitHub Actions run page of the first push
 ```
 
 ## Environment
@@ -380,29 +381,92 @@ All line numbers are in `.github/workflows/session-16-cicd.yml`.
 | GitHub Actions workflow | `/.github/workflows/session-16-cicd.yml` (copy in `.github/workflows/` here) |
 | CI pipeline | jobs `test` and `build` |
 | CD pipeline | jobs `publish` (GHCR) and `deploy` (kind) |
-| Screenshots of successful pipeline execution | "Pipeline execution" below (added after the push) |
+| Screenshots of successful pipeline execution | `screenshots/03-actions-run-37668580543.png` and the run output in "Pipeline execution" below |
 | README explaining each concept with line references | this file, table above |
 
 ## Pipeline execution
 
-<!-- TODO-POSTPUSH: fill this section after the repo is pushed to GitHub -->
-**TODO-POSTPUSH** - The workflow runs on GitHub after the lead pushes the repository. It cannot run before that, so this section is still empty. To fill it in:
+These are the real GitHub Actions results from the **first push of the repository**: commit `9856f93` ("Initial commit") on `main`, 2026-10-07, run [37668580543](https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/37668580543) of "Session 16 - CI/CD Pipeline". The workflow that ran is byte-identical to the one in the repo now:
 
 ```bash
-gh run list --workflow "Session 16 - CI/CD Pipeline" --limit 5
-gh run watch <run-id>
-gh run view <run-id> --log | grep -E "passed|Published|successfully rolled out"
+$ git show 9856f93:.github/workflows/session-16-cicd.yml | cmp - .github/workflows/session-16-cicd.yml && echo "identical"
+identical
 ```
 
-Screenshots to add to `screenshots/`:
+Nothing in this session's code changed after that commit either. Only README text was edited afterwards. Any later push that touches this folder or the workflow file triggers the workflow again, so newer runs will appear on the Actions page.
 
-- `03-actions-run-graph.png`: the run summary page with the job graph test (x3) -> build / secrets-demo -> publish -> deploy, all green
-- `04-actions-test-log.png`: the "Run unit tests with coverage" step log (11 passed)
-- `05-actions-artifacts.png`: the Artifacts list (test reports x3, s16-app-package, s16-image)
-- `06-actions-deploy-log.png`: the deploy job's rollout + smoke-test output
-- `07-ghcr-package.png`: the `s16-cicd-demo` package on GHCR with the `sha-...` and `latest` tags
+The public run page (headless Chrome, not signed in, 1280x1400):
 
-Optional: to see the "secret is set" branch of `secrets-demo`, add a repository secret `DEMO_API_KEY` with any fake value (Settings > Secrets and variables > Actions) and re-run the workflow.
+![GitHub Actions run 37668580543, all jobs green](screenshots/03-actions-run-37668580543.png)
+
+Run result and jobs (read-only `gh` calls):
+
+```bash
+$ gh run view 37668580543 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --json displayTitle,event,headSha,conclusion,createdAt,updatedAt,workflowName \
+    --jq '"\(.workflowName) | event=\(.event) | sha=\(.headSha[0:7]) | conclusion=\(.conclusion) | \(.createdAt) -> \(.updatedAt)"'
+Session 16 - CI/CD Pipeline | event=push | sha=9856f93 | conclusion=success | 2026-10-07T18:40:07Z -> 2026-10-07T18:42:58Z
+$ gh run view 37668580543 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --json jobs \
+    --jq '.jobs[] | "\(.conclusion | ascii_upcase)  \(.name)  (\(((.completedAt|fromdate) - (.startedAt|fromdate)))s)"'
+SUCCESS  Test (Python 3.12)  (16s)
+SUCCESS  Test (Python 3.13)  (13s)
+SUCCESS  Test (Python 3.14)  (19s)
+SUCCESS  Build and package  (25s)
+SUCCESS  Secrets demo  (5s)
+SUCCESS  Publish image to GHCR  (26s)
+SUCCESS  Deploy to Kubernetes (kind)  (86s)
+```
+
+Key lines from the job logs (filtered with grep. The `...` lines mark where I cut echoed script lines):
+
+```bash
+$ gh run view 37668580543 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --log \
+  | grep -E 'Runner: GitHub|passed in|Git commit  :|Build completed|"status":"ok"|"app":"s16|"result"|API call OK|DEMO_API_KEY is not|: digest: sha256|successfully rolled out|(deployment|pod)[.a-z]*/s16-cicd-demo' \
+  | grep -v '36;1m' \
+  | awk -F'\t' '{sub(/^[^ ]+ /, "", $3); print $1 " | " $3}'
+Test (Python 3.12) | Runner: GitHub Actions 1000000000 | OS: Linux | arch: X64
+Test (Python 3.12) | ============================== 11 passed in 0.45s ==============================
+Test (Python 3.13) | Runner: GitHub Actions 1000000001 | OS: Linux | arch: X64
+Test (Python 3.13) | ============================== 11 passed in 0.17s ==============================
+Test (Python 3.14) | Runner: GitHub Actions 1000000002 | OS: Linux | arch: X64
+Test (Python 3.14) | ============================== 11 passed in 0.19s ==============================
+Build and package | Git commit  : 9856f930dd849ff2e7c8bd376fabb20e128ac3dd
+Build and package | Build completed successfully.
+Build and package | {"status":"ok"}
+Build and package | {"app":"s16-cicd-demo","git_sha":"9856f93","hostname":"ce4709fcfac4","python":"3.14.8","version":"1.0.0"}
+Build and package | {"a":2.0,"b":3.0,"op":"add","result":5.0}
+Secrets demo | Authenticated API call OK -> vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA, default branch main
+Secrets demo | DEMO_API_KEY is not set - skipping. Add it under Settings > Secrets and variables > Actions.
+Publish image to GHCR | sha-9856f93: digest: sha256:e6a58998c9f098dbc61df3d4a52881f0f6f97dea1cd9756bffac651bf427f258 size: 2199
+Publish image to GHCR | latest: digest: sha256:e6a58998c9f098dbc61df3d4a52881f0f6f97dea1cd9756bffac651bf427f258 size: 2199
+Deploy to Kubernetes (kind) | deployment.apps/s16-cicd-demo created
+Deploy to Kubernetes (kind) | ##[group]Run kubectl -n "${NAMESPACE}" rollout status deployment/s16-cicd-demo --timeout=180s
+Deploy to Kubernetes (kind) | deployment "s16-cicd-demo" successfully rolled out
+Deploy to Kubernetes (kind) | {"status":"ok"}
+Deploy to Kubernetes (kind) | {"app":"s16-cicd-demo","git_sha":"9856f93","hostname":"s16-cicd-demo-7597866d55-6g69l","python":"3.14.8","version":"1.0.0"}
+Deploy to Kubernetes (kind) | {"a":6.0,"b":7.0,"op":"multiply","result":42.0}
+Deploy to Kubernetes (kind) | deployment.apps/s16-cicd-demo   2/2     2            2           7s    app          ghcr.io/vanshhhhhhhhh/s16-cicd-demo:sha-9856f93   app=s16-cicd-demo
+Deploy to Kubernetes (kind) | pod/s16-cicd-demo-7597866d55-6g69l   1/1     Running   0          7s    10.244.0.6   s16-kind-control-plane   <none>           <none>
+Deploy to Kubernetes (kind) | pod/s16-cicd-demo-7597866d55-mpgsc   1/1     Running   0          7s    10.244.0.5   s16-kind-control-plane   <none>           <none>
+```
+
+Artifacts of the run:
+
+```bash
+$ gh api repos/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/37668580543/artifacts --jq '.artifacts[] | "\(.name)  \(.size_in_bytes) bytes  expires \(.expires_at)"'
+s16-app-package  5502 bytes  expires 2026-10-21T18:40:38Z
+s16-test-reports-py3.13  1170 bytes  expires 2026-10-21T18:40:18Z
+s16-test-reports-py3.14  1164 bytes  expires 2026-10-21T18:40:26Z
+s16-test-reports-py3.12  1168 bytes  expires 2026-10-21T18:40:22Z
+```
+
+What the run shows:
+
+- **Runners and matrix:** three separate runners (`GitHub Actions 1000000000/1/2`, Linux X64) each ran the 11 tests, on Python 3.12, 3.13 and 3.14.
+- **Build:** `build-info.txt` recorded the full commit `9856f930dd...`, and the image was tagged `sha-9856f93`. The smoke test of the freshly built container returned `git_sha 9856f93`.
+- **Secrets:** the `GITHUB_TOKEN` call authenticated, and the optional `DEMO_API_KEY` was not set, so the step took the "skipping" branch and still passed.
+- **CD:** `publish` pushed `sha-9856f93` and `latest`, both with the same digest `sha256:e6a58998...`. `deploy` rolled out 2/2 pods in the kind cluster (`s16-kind-control-plane`) and the curl through port-forward reached pod `s16-cicd-demo-7597866d55-6g69l`.
+- **Artifacts:** test reports for each Python version and the app package are listed above. The image tarball artifact had a 3-day retention (workflow line 152), so it has already expired. Its upload is in the build log: `Artifact s16-image has been successfully uploaded! Final size is 45546786 bytes.`
+- The run page shows a notice on every job: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026". Runs after that date will use the newer runner image. I have not tested the workflow on it.
 
 ## What I learned
 
