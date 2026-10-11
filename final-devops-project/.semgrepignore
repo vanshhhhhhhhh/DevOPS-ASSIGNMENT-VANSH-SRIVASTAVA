@@ -1,0 +1,10 @@
+# Paths Semgrep skips (this file replaces Semgrep's default ignore list).
+node_modules/
+dist/
+reports/
+.terraform/
+screenshots/
+# Deliberately broken manifests for the troubleshooting lab (not deployed by the pipeline).
+troubleshooting/
+# Tests use assert and fixtures by design.
+application/backend/tests/

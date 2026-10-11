@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Backend image for TicketDesk (FastAPI). Build context: application/backend
 #   docker build -f docker/backend.Dockerfile -t ticketdesk-backend:1.0.0 application/backend
 # Base images come from the ECR Public mirror of the Docker official images

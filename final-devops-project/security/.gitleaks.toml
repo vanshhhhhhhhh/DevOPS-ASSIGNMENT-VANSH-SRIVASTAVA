@@ -15,10 +15,11 @@ regex = '''postgres(?:ql)?(?:\+\w+)?://[^:\s/]+:([^@\s]{6,})@'''
 secretGroup = 1
 keywords = ["postgres"]
 
-  # The documented demo password and shell/compose placeholders are allowed.
+  # The documented demo password, gitleaks' own REDACTED marker (README output)
+  # and shell/compose/Helm placeholders are allowed.
   [[rules.allowlists]]
   regexTarget = "secret"
-  regexes = ['''^demo-password-123$''', '''^\$\{?[A-Z_]+''', '''^\{\{''']
+  regexes = ['''^demo-password-123$''', '''^REDACTED$''', '''^\$\{?[A-Z_]+''', '''^\{\{''']
 
 [allowlist]
 description = "Build output and dependencies are not source"

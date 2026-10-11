@@ -1,0 +1,376 @@
+# Session 21 final project (TicketDesk) - CI/CD + DevSecOps pipeline.
+# GitHub only runs workflows from the repository root, so this file is the one that
+# executes. An identical copy lives at final-devops-project/.github/workflows/ci-cd.yml
+# so the project folder is self-contained.
+#
+# Flow: build+test -> SAST / SCA / secret scan (parallel) -> docker build -> Trivy gate
+#       -> push to GHCR (push to main only) -> deploy to an ephemeral kind cluster + smoke test
+name: Final project CI/CD (TicketDesk)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "final-devops-project/**"
+      - ".github/workflows/final-project.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "final-devops-project/**"
+      - ".github/workflows/final-project.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: final-project-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+    working-directory: final-devops-project
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.75.0
+  GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1
+  SEMGREP_IMAGE: mirror.gcr.io/semgrep/semgrep:1.179.0
+  KIND_CLUSTER: final-ci
+
+jobs:
+  build-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:17-alpine
+        env:
+          POSTGRES_DB: ticketdesk_test
+          POSTGRES_USER: ticketdesk
+          POSTGRES_PASSWORD: demo-password-123 # throw-away CI database, not a real secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ticketdesk -d ticketdesk_test"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ticketdesk:demo-password-123@localhost:5432/ticketdesk_test
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: final-devops-project/application/backend/requirements*.txt
+
+      - name: Install backend dependencies
+        working-directory: final-devops-project/application/backend
+        run: pip install -r requirements-dev.txt
+
+      - name: Apply Alembic migrations to the CI database
+        working-directory: final-devops-project/application/backend
+        run: alembic upgrade head
+
+      - name: Run pytest with coverage (PostgreSQL service container)
+        working-directory: final-devops-project/application/backend
+        run: pytest -v --cov=app --cov-report=term-missing --cov-report=xml:coverage.xml --junitxml=junit.xml
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: final-devops-project/application/frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: final-devops-project/application/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-reports
+          path: |
+            final-devops-project/application/backend/junit.xml
+            final-devops-project/application/backend/coverage.xml
+          if-no-files-found: warn
+
+      - name: Upload frontend build
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-dist
+          path: final-devops-project/application/frontend/dist
+          retention-days: 7
+
+  sast:
+    name: SAST (Bandit, Semgrep) + IaC config scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Bandit
+        run: pip install bandit==1.9.4
+
+      - name: Bandit report (JSON)
+        run: |
+          mkdir -p reports
+          bandit -c security/bandit.yaml -r application/backend/app -f json -o reports/bandit.json --exit-zero
+
+      - name: Bandit gate (fail on medium or high severity)
+        run: bandit -c security/bandit.yaml -r application/backend/app --severity-level medium
+
+      - name: Semgrep gate (python, javascript, dockerfile, kubernetes rules)
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" \
+            semgrep scan --config p/python --config p/javascript --config p/dockerfile --config p/kubernetes \
+            --metrics=off --error --json-output=reports/semgrep.json
+
+      - name: Trivy IaC misconfiguration scan (report only)
+        if: always()
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work "$TRIVY_IMAGE" config \
+            --severity HIGH,CRITICAL --exit-code 0 --skip-dirs troubleshooting \
+            --format json --output reports/trivy-config.json .
+          docker run --rm -v "$PWD:/work" -w /work "$TRIVY_IMAGE" config \
+            --severity HIGH,CRITICAL --exit-code 0 --skip-dirs troubleshooting --table-mode summary .
+
+      - name: Upload SAST reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sast-reports
+          path: final-devops-project/reports/
+          if-no-files-found: warn
+
+  sca:
+    name: SCA (pip-audit, npm audit, Trivy fs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pip-audit
+        run: pip install pip-audit==2.10.1
+
+      - name: pip-audit gate (Python dependencies)
+        run: |
+          mkdir -p reports
+          pip-audit -r application/backend/requirements.txt -f json -o reports/pip-audit.json || true
+          pip-audit -r application/backend/requirements.txt
+
+      - name: npm audit gate (fail on high or critical)
+        working-directory: final-devops-project/application/frontend
+        run: |
+          npm audit --json > ../../reports/npm-audit.json || true
+          npm audit --audit-level=high
+
+      - name: Trivy filesystem gate (dependency CVEs and secrets)
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work "$TRIVY_IMAGE" fs --no-progress --config security/trivy.yaml \
+            --scanners vuln,secret --include-dev-deps --exit-code 0 --format json --output reports/trivy-fs.json application/
+          docker run --rm -v "$PWD:/work" -w /work "$TRIVY_IMAGE" fs --no-progress --config security/trivy.yaml \
+            --scanners vuln,secret --include-dev-deps application/
+
+      - name: Upload SCA reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: sca-reports
+          path: final-devops-project/reports/
+          if-no-files-found: warn
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Scoped to this folder on purpose: other session folders contain fake demo secrets.
+      - name: gitleaks gate
+        working-directory: .
+        run: |
+          mkdir -p final-devops-project/reports
+          docker run --rm -v "$PWD/final-devops-project:/repo/final-devops-project" -w /repo "$GITLEAKS_IMAGE" \
+            dir final-devops-project --config final-devops-project/security/.gitleaks.toml \
+            --redact --no-banner --report-format json --report-path final-devops-project/reports/gitleaks.json
+
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: gitleaks-report
+          path: final-devops-project/reports/gitleaks.json
+          if-no-files-found: warn
+
+  image:
+    name: Docker build, Trivy gate, push to GHCR
+    needs: [build-test, sast, sca, secret-scan]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Compute image names
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          {
+            echo "IMAGE_TAG=${GITHUB_SHA}"
+            echo "BACKEND_REPO=ghcr.io/${owner}/ticketdesk-backend"
+            echo "FRONTEND_REPO=ghcr.io/${owner}/ticketdesk-frontend"
+          } >> "$GITHUB_ENV"
+
+      - name: Build backend image
+        run: |
+          docker build -f docker/backend.Dockerfile \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "ticketdesk-backend:${IMAGE_TAG}" -t "${BACKEND_REPO}:${IMAGE_TAG}" application/backend
+
+      - name: Build frontend image
+        run: |
+          docker build -f docker/frontend.Dockerfile \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            -t "ticketdesk-frontend:${IMAGE_TAG}" -t "${FRONTEND_REPO}:${IMAGE_TAG}" application/frontend
+
+      - name: Trivy image reports (all severities, JSON)
+        run: |
+          mkdir -p reports "$HOME/.cache/trivy"
+          for img in ticketdesk-backend ticketdesk-frontend; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+              -v "$PWD:/work" -w /work "$TRIVY_IMAGE" image --no-progress --scanners vuln --exit-code 0 \
+              --format json --output "reports/trivy-${img}.json" "${img}:${IMAGE_TAG}"
+          done
+
+      - name: Trivy security gate (fail on fixable HIGH/CRITICAL)
+        run: |
+          for img in ticketdesk-backend ticketdesk-frontend; do
+            echo "::group::Trivy gate ${img}"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+              -v "$PWD:/work" -w /work "$TRIVY_IMAGE" image --no-progress --config security/trivy.yaml "${img}:${IMAGE_TAG}"
+            echo "::endgroup::"
+          done
+
+      - name: Upload image scan reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-image-reports
+          path: final-devops-project/reports/
+          if-no-files-found: warn
+
+      - name: Save images for the deploy job
+        run: docker save -o /tmp/ticketdesk-images.tar "ticketdesk-backend:${IMAGE_TAG}" "ticketdesk-frontend:${IMAGE_TAG}"
+
+      - name: Upload images
+        uses: actions/upload-artifact@v7
+        with:
+          name: ticketdesk-images
+          path: /tmp/ticketdesk-images.tar
+          retention-days: 1
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push images to GHCR (commit SHA tag)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker push "${BACKEND_REPO}:${IMAGE_TAG}"
+          docker push "${FRONTEND_REPO}:${IMAGE_TAG}"
+          {
+            echo "### Images pushed"
+            echo "- \`${BACKEND_REPO}:${IMAGE_TAG}\`"
+            echo "- \`${FRONTEND_REPO}:${IMAGE_TAG}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-kind:
+    name: Deploy to ephemeral kind cluster (Helm) + smoke test
+    needs: image
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download images
+        uses: actions/download-artifact@v8
+        with:
+          name: ticketdesk-images
+          path: /tmp/images
+
+      - name: Load images into the runner's Docker
+        run: docker load -i /tmp/images/ticketdesk-images.tar
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: ${{ env.KIND_CLUSTER }}
+
+      - uses: azure/setup-helm@v5
+        with:
+          version: v4.3.0
+
+      - name: Load images into the kind node
+        run: |
+          kind load docker-image "ticketdesk-backend:${IMAGE_TAG}" "ticketdesk-frontend:${IMAGE_TAG}" --name "$KIND_CLUSTER"
+
+      - name: Helm lint
+        run: helm lint helm/ticketdesk -f helm/ticketdesk/values-ci.yaml
+
+      - name: helm upgrade --install
+        run: |
+          helm upgrade --install final-ticketdesk helm/ticketdesk \
+            --namespace final-app --create-namespace \
+            -f helm/ticketdesk/values-ci.yaml \
+            --set backend.image.tag="${IMAGE_TAG}" \
+            --set frontend.image.tag="${IMAGE_TAG}" \
+            --wait --timeout 6m
+
+      - name: Wait for rollout
+        run: |
+          kubectl -n final-app rollout status statefulset/final-ticketdesk-postgres --timeout=180s
+          kubectl -n final-app rollout status deployment/final-ticketdesk-backend --timeout=180s
+          kubectl -n final-app rollout status deployment/final-ticketdesk-frontend --timeout=120s
+          kubectl -n final-app get pods,svc,pvc
+
+      - name: helm test
+        run: helm test final-ticketdesk -n final-app --logs
+
+      - name: Smoke test through a port-forward
+        run: |
+          kubectl -n final-app port-forward svc/final-ticketdesk-frontend 8080:80 > /tmp/port-forward.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:8080/healthz > /dev/null && break
+            sleep 1
+          done
+          bash scripts/smoke-test.sh http://localhost:8080
+
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          kubectl get all -A || true
+          kubectl -n final-app describe pods || true
+          kubectl -n final-app logs -l app.kubernetes.io/component=backend --tail=100 || true
+          kubectl -n final-app get events --sort-by=.lastTimestamp || true

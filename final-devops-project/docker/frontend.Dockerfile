@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 # Frontend image for TicketDesk. Build context: application/frontend
 #   docker build -f docker/frontend.Dockerfile -t ticketdesk-frontend:1.0.0 application/frontend
 # Stage 1 builds the static site with Node; stage 2 serves it with an

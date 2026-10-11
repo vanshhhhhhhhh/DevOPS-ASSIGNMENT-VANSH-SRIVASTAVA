@@ -80,14 +80,19 @@ spec:
             limits: { cpu: 500m, memory: 256Mi }
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities: { drop: ["ALL"] }
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
             - name: run
               mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
       volumes:
         - name: run
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
   volumeClaimTemplates:
     - apiVersion: v1

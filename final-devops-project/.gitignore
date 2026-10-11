@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+junit.xml
+htmlcov/
+*.db
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+npm-debug.log*
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+terraform.tfvars
+
+# Scan and test reports produced locally or in CI
+reports/
+security/reports/
+
+# Local env files
+.env
+docker/.env
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

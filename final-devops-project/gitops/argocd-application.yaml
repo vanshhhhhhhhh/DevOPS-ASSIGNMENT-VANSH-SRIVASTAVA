@@ -1,0 +1,41 @@
+# Argo CD Application for the TicketDesk Helm chart (GitOps).
+# Git is the source of truth: Argo CD renders final-devops-project/helm/ticketdesk
+# from the main branch with values-minikube.yaml and keeps namespace final-app in
+# sync with it (automated sync, prune, self-heal).
+#   kubectl apply -f final-devops-project/gitops/argocd-application.yaml
+# The release name matches the Helm release installed by hand (final-ticketdesk),
+# so Argo CD renders exactly the same object names and adopts the running objects.
+# No resources-finalizer on purpose: deleting this Application does not delete the app.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: final-ticketdesk
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: ticketdesk
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA.git
+    targetRevision: main
+    path: final-devops-project/helm/ticketdesk
+    helm:
+      releaseName: final-ticketdesk
+      valueFiles:
+        - values-minikube.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: final-app
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 1m
+  revisionHistoryLimit: 5
