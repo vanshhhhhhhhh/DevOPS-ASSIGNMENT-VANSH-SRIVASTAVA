@@ -1,0 +1,9 @@
+# never commit real credentials or local copies of them
+*.env
+.env*
+*.key
+*.pem
+*.crt
+*secret*.local.yaml
+kubeconfig*
+.DS_Store
