@@ -362,34 +362,150 @@ I ran the rehearsal three times while fixing small things in `demo.sh` (a stray 
 
 ## Live sync (after push)
 
-**TODO-POSTPUSH:** this section is filled in after the repository is pushed to `main` on GitHub. Until then nothing has been synced from GitHub.
-
-Commands to run after the push (from the repo root, with the kubectl context on the minikube cluster where Argo CD is running):
+The repository was pushed to `main` on 2026-10-12, and I ran `demo.sh` against GitHub. This time Argo CD cloned the real repo and synced commit `4c9767e`, not the in-cluster chart used in the rehearsal.
 
 ```bash
 cd session-20-monitoring-observability-gitops/03-gitops
-./demo.sh 2>&1 | tee /tmp/s20-gitops-demo.txt
-```
-
-`demo.sh` applies `argocd-application.yaml`, waits until the Application is `Synced/Healthy` (Argo CD fetches the repo on creation, so there is no need to wait for the 3-minute poll), lists the resources, curls the version string through a port-forward on local port 8300, scales `s20-web` to 5 and deletes the `s20-web` Service, and shows Argo CD reverting both. It finishes with the sync history (which now shows the Git commit SHA instead of `0.1.0`) and the Application's events.
-
-Optional GitOps change through Git (the real "change Git, cluster follows" step):
-
-```bash
-# edit app/deployment.yaml: APP_VERSION "v1.0.0" -> "v1.1.0" (and/or replicas: 2 -> 3)
-git add session-20-monitoring-observability-gitops/03-gitops/app/deployment.yaml
-git commit -m "s20 gitops demo: bump to v1.1.0"
-git push
-kubectl annotate application s20-gitops-demo -n argocd argocd.argoproj.io/refresh=normal --overwrite   # or wait up to ~3 min
-kubectl get application s20-gitops-demo -n argocd -w
-kubectl -n s20-gitops-demo exec deploy/s20-web -- cat /usr/share/nginx/html/version.json
+./demo.sh
 ```
 
 Output of `./demo.sh` against GitHub:
 
 ```text
-TODO-POSTPUSH
+
+========== 0. Argo CD is running in namespace argocd ==========
+$ kubectl get pods -n argocd
+NAME                                                READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                     1/1     Running   0          4d2h
+argocd-applicationset-controller-76fd8cdd4f-gzfd4   1/1     Running   0          4d2h
+argocd-dex-server-66c78cf887-f79bn                  1/1     Running   0          4d2h
+argocd-notifications-controller-7fb9868fd6-2vxwm    1/1     Running   0          4d2h
+argocd-redis-bdbdffcb4-rjkfh                        1/1     Running   0          4d2h
+argocd-repo-server-d89c7967d-44f8t                  1/1     Running   0          4d2h
+argocd-server-776b7cdd4d-9flrm                      1/1     Running   0          4d2h
+
+========== 1. Apply the Argo CD Application (argocd-application.yaml) ==========
+$ kubectl apply -f argocd-application.yaml
+application.argoproj.io/s20-gitops-demo created
+
+========== 2. Wait for Synced / Healthy (timeout 300s) ==========
+  02:00:11  sync/health = <not reported yet>
+  02:00:16  sync/health = Synced/Progressing
+  02:00:21  sync/health = Synced/Healthy
+$ kubectl get application s20-gitops-demo -n argocd
+NAME              SYNC STATUS   HEALTH STATUS
+s20-gitops-demo   Synced        Healthy
+synced revision: 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8
+
+========== 3. Resources Argo CD created from the source ==========
+$ kubectl get all -n s20-gitops-demo
+NAME                           READY   STATUS    RESTARTS   AGE
+pod/s20-web-66498b56d7-ms2w7   1/1     Running   0          5s
+pod/s20-web-66498b56d7-t5gqr   1/1     Running   0          5s
+
+NAME              TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+service/s20-web   ClusterIP   10.101.248.166   <none>        80/TCP    5s
+
+NAME                      READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/s20-web   2/2     2            2           5s
+
+NAME                                 DESIRED   CURRENT   READY   AGE
+replicaset.apps/s20-web-66498b56d7   2         2         2       5s
+$ kubectl get application s20-gitops-demo -n argocd -o jsonpath='{range .status.resources[*]}...'
+Namespace	s20-gitops-demo	Synced	
+Service	s20-web	Synced	
+Deployment	s20-web	Synced	
+$ curl -s http://localhost:8300/version.json
+{"version":"v1.0.0","pod":"s20-web-66498b56d7-ms2w7"}
+$ curl -s http://localhost:8300/
+<h1>Session 20 GitOps demo</h1>
+<p>version: v1.0.0</p>
+<p>served by pod: s20-web-66498b56d7-ms2w7</p>
+<p>deployed by Argo CD from github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA</p>
+
+========== 4a. Self-heal: change the replica count by hand (drift from the desired state) ==========
+desired replicas (from source): 2
+$ kubectl scale deployment s20-web -n s20-gitops-demo --replicas=5
+deployment.apps/s20-web scaled
+  02:00:23  spec.replicas=5   argocd sync/health=Synced/Healthy
+  02:00:25  spec.replicas=2   argocd sync/health=Synced/Healthy
+$ kubectl get deployment s20-web -n s20-gitops-demo
+NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+s20-web   2/2     2            2           9s
+
+========== 4b. Self-heal: delete the Service by hand ==========
+$ kubectl delete service s20-web -n s20-gitops-demo
+service "s20-web" deleted from s20-gitops-demo namespace
+  02:00:25  service/s20-web missing   argocd sync/health=Synced/Healthy
+  02:00:27  service/s20-web exists again
+$ kubectl get service s20-web -n s20-gitops-demo
+NAME      TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+s20-web   ClusterIP   10.110.91.90   <none>        80/TCP    2s
+
+========== 5. Argo CD's record of what happened ==========
+$ kubectl get application s20-gitops-demo -n argocd
+NAME              SYNC STATUS   HEALTH STATUS
+s20-gitops-demo   Synced        Healthy
+$ kubectl get application s20-gitops-demo -n argocd -o jsonpath='{range .status.history[*]}...'
+id=0  revision=4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8  deployedAt=2026-10-11T20:30:16Z
+last operation: Succeeded - successfully synced (all tasks run)
+$ kubectl get events -n argocd --field-selector involvedObject.uid=eb54bf4f-e56e-4464-9d87-22734be2463b --sort-by=.lastTimestamp -o custom-columns=TIME:.lastTimestamp,REASON:.reason,MESSAGE:.message
+TIME                   REASON               MESSAGE
+2026-10-11T20:30:16Z   OperationStarted     Initiated automated sync to '4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8'
+2026-10-11T20:30:16Z   ResourceUpdated      Updated sync status:  -> OutOfSync
+2026-10-11T20:30:16Z   ResourceUpdated      Updated health status:  -> Missing
+2026-10-11T20:30:16Z   ResourceUpdated      Updated health status: Missing -> Healthy
+2026-10-11T20:30:16Z   OperationCompleted   Sync operation to 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8 succeeded
+2026-10-11T20:30:16Z   ResourceUpdated      Updated sync status: OutOfSync -> Synced
+2026-10-11T20:30:16Z   ResourceUpdated      Updated health status: Healthy -> Progressing
+2026-10-11T20:30:17Z   ResourceUpdated      Updated health status: Progressing -> Healthy
+2026-10-11T20:30:23Z   OperationStarted     Initiated automated sync to '4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8'
+2026-10-11T20:30:23Z   ResourceUpdated      Updated sync status: Synced -> OutOfSync
+2026-10-11T20:30:23Z   ResourceUpdated      Updated health status: Healthy -> Progressing
+2026-10-11T20:30:23Z   OperationCompleted   Partial sync operation to 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8 succeeded
+2026-10-11T20:30:23Z   ResourceUpdated      Updated sync status: OutOfSync -> Synced
+2026-10-11T20:30:23Z   ResourceUpdated      Updated health status: Progressing -> Healthy
+2026-10-11T20:30:25Z   OperationStarted     Initiated automated sync to '4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8'
+2026-10-11T20:30:25Z   ResourceUpdated      Updated sync status: Synced -> OutOfSync
+2026-10-11T20:30:25Z   OperationCompleted   Partial sync operation to 4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8 succeeded
+2026-10-11T20:30:25Z   ResourceUpdated      Updated sync status: OutOfSync -> Synced
+
+Done. The Application stays in place; Argo CD keeps reconciling s20-gitops-demo from the source.
+Clean up with: kubectl delete -f argocd-application.yaml && kubectl delete namespace s20-gitops-demo
 ```
+
+The sync took about 10 seconds from `kubectl apply` to `Synced/Healthy`. The synced revision is the Git commit SHA, which proves Argo CD read the manifests from GitHub. Both kinds of manual drift were reverted within about 2 seconds: the replica count went from 5 back to 2, and the deleted Service was recreated. The "Partial sync" events are those two self-heal operations.
+
+### Change Git, the cluster follows
+
+This is the core GitOps loop. I changed `APP_VERSION` from `v1.0.0` to `v1.1.0` in `app/deployment.yaml`, committed it and pushed it to `main`. I did not run `kubectl apply` for the app. I only asked Argo CD to refresh instead of waiting for its 3-minute poll:
+
+```text
+$ git log --oneline -1
+7a1f298 Session 20: bump GitOps demo app to v1.1.0 to show Argo CD following Git
+$ git show --format= HEAD | grep -E '^[-+] '
+-              value: "v1.0.0"
++              value: "v1.1.0"
+$ kubectl annotate application s20-gitops-demo -n argocd argocd.argoproj.io/refresh=normal --overwrite
+application.argoproj.io/s20-gitops-demo annotated
+  02:01:00  revision=4c9767e  sync/health=Synced/Healthy
+  02:01:03  revision=4c9767e  sync/health=Synced/Healthy
+  02:01:06  revision=7a1f298  sync/health=Synced/Healthy
+$ kubectl rollout status deployment/s20-web -n s20-gitops-demo
+deployment "s20-web" successfully rolled out
+$ kubectl get application s20-gitops-demo -n argocd -o jsonpath='{range .status.history[*]}...'
+id=0  revision=4c9767ef2c9e2532ba5cff703368d2e1bfcfd7f8  deployedAt=2026-10-11T20:30:16Z
+id=1  revision=7a1f298d89cc7cd3ef3f066876647be701605f23  deployedAt=2026-10-11T20:31:03Z
+$ kubectl get pods -n s20-gitops-demo
+NAME                       READY   STATUS      RESTARTS   AGE
+s20-web-66498b56d7-ms2w7   0/1     Completed   0          50s
+s20-web-7966869d68-h68p7   1/1     Running     0          2s
+s20-web-7966869d68-ltp6k   1/1     Running     0          2s
+$ kubectl -n s20-gitops-demo exec deploy/s20-web -- cat /usr/share/nginx/html/version.json
+{"version":"v1.1.0","pod":"s20-web-7966869d68-ltp6k"}
+```
+
+Argo CD picked up commit `7a1f298` and rolled the Deployment out. The sync history now has two entries, one per Git commit, and the new pods serve `v1.1.0`. To go back, I would revert the commit in Git rather than touch the cluster.
 
 ## Cleanup (after the demo)
 

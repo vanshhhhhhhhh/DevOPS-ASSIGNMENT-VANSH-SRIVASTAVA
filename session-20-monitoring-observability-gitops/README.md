@@ -87,10 +87,10 @@ Full details: [03-gitops/README.md](03-gitops/README.md).
 
 - Covers what GitOps is, Git as the source of truth, declarative configuration, continuous reconciliation, the GitOps workflow, and Kubernetes + GitOps (push vs pull, environments, secrets).
 - **Argo CD v3.5.4** is installed from the official stable manifest into namespace `argocd`. All 7 pods are Running, and it is **left running**. UI: `kubectl port-forward svc/argocd-server -n argocd 18443:443`, then https://localhost:18443 as user `admin`. Password: `kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d; echo`.
-- `03-gitops/app/` has plain manifests (namespace `s20-gitops-demo`, Deployment `s20-web` showing `version: v1.0.0`, Service). `argocd-application.yaml` points Argo CD at `https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA.git`, `main`, path `session-20-monitoring-observability-gitops/03-gitops/app`, with automated sync, prune and selfHeal.
+- `03-gitops/app/` has plain manifests (namespace `s20-gitops-demo`, Deployment `s20-web` with a visible version string, `v1.1.0` since the GitOps change, and a Service). `argocd-application.yaml` points Argo CD at `https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA.git`, `main`, path `session-20-monitoring-observability-gitops/03-gitops/app`, with automated sync, prune and selfHeal.
 - Before the push, applying the Application gave `ComparisonError ... remote repository is empty` and deployed nothing. I deleted it again.
 - A rehearsal of `demo.sh` against an in-cluster Helm chart repo built from the same manifests showed a real sync to Synced/Healthy and real self-heal: a manual scale to 5 was reverted to 2 within 2 s, and a deleted Service was recreated within 2 s.
-- **Still to do after the push:** run `03-gitops/demo.sh` and paste its output into the `TODO-POSTPUSH` block in [03-gitops/README.md](03-gitops/README.md#live-sync-after-push).
+- **Live sync from GitHub (after the push):** Argo CD synced commit `4c9767e` to Synced/Healthy and reverted both kinds of manual drift. When I changed `APP_VERSION` to `v1.1.0` in Git (commit `7a1f298`), it rolled the new version out with no `kubectl apply` from me. The output is in [03-gitops/README.md](03-gitops/README.md#live-sync-after-push).
 
 ## What I learned
 
