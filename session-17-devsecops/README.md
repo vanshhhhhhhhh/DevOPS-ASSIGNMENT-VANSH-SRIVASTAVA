@@ -4,7 +4,7 @@
 **Enrollment No.:** 24bcs10567
 **Session:** 17
 
-DevSecOps adds security checks to the CI/CD pipeline itself instead of leaving them for a separate review at the end. For this session I built a small Flask "notes" API and one GitHub Actions workflow that follows the brief's flow: Code -> Build -> Unit Test -> SAST -> SCA -> Secret Scan -> Docker Build -> Container Image Scan -> Security Gate -> Push Image -> Deploy to Kubernetes. The scanners (Bandit, Semgrep, pip-audit, Trivy, gitleaks) write JSON reports, and one gate script turns those reports into a pass/fail decision. Only an image that passes is pushed to GHCR and deployed, to hardened Kubernetes manifests. I ran every tool locally against my code and image (all clean), then ran them against a deliberately insecure copy to show the gate blocking it. I also deployed the manifests to minikube. The GitHub run is added after the push.
+DevSecOps adds security checks to the CI/CD pipeline itself instead of leaving them for a separate review at the end. For this session I built a small Flask "notes" API and one GitHub Actions workflow that follows the brief's flow: Code -> Build -> Unit Test -> SAST -> SCA -> Secret Scan -> Docker Build -> Container Image Scan -> Security Gate -> Push Image -> Deploy to Kubernetes. The scanners (Bandit, Semgrep, pip-audit, Trivy, gitleaks) write JSON reports, and one gate script turns those reports into a pass/fail decision. Only an image that passes is pushed to GHCR and deployed, to hardened Kubernetes manifests. I ran every tool locally against my code and image (all clean), then ran them against a deliberately insecure copy to show the gate blocking it. I also deployed the manifests to minikube. After the repo was pushed, the workflow ran on GitHub and every stage passed (see "Pipeline execution"). The stages follow the instructor's `session-17-devsecops` material and demo workflow in the course repo (https://github.com/Nency-Ravaliya/devops-heros). I wrote my own app, workflow and configs and did not copy those files.
 
 ## Folder structure
 
@@ -32,7 +32,8 @@ session-17-devsecops/
 ├── VERSION, pytest.ini, requirements.txt, requirements-dev.txt
 └── screenshots/
     ├── 01-s17-app-docker.png         # hardened container in Docker
-    └── 02-s17-app-minikube.png       # same image deployed to minikube
+    ├── 02-s17-app-minikube.png       # same image deployed to minikube
+    └── 03-actions-run-37668580592.png  # the GitHub Actions run page of the first push
 ```
 
 ## Environment
@@ -691,27 +692,119 @@ Every `run:` command in the scan jobs was run locally, in the same form, before 
 | GitHub Actions workflow | `/.github/workflows/session-17-devsecops.yml` (copy in `.github/workflows/` here) |
 | Security tools configuration | `security/bandit.yaml`, `security/semgrep.yml`, `security/gitleaks.toml`, `security/security-gate.sh`, pinned versions in workflow lines 34-39 |
 | Kubernetes manifests (non-root, read-only fs, dropped caps, limits, probes) | `k8s/namespace.yaml`, `k8s/deployment.yaml`, `k8s/service.yaml` |
-| Successful pipeline output | local outputs above; GitHub run in "Pipeline execution" (after push) |
+| Successful pipeline output | GitHub run 37668580592 in "Pipeline execution" (screenshot + logs), local outputs above |
 | Complete README | this file |
 
 ## Pipeline execution
 
-<!-- TODO-POSTPUSH: fill this section after the repo is pushed to GitHub -->
-**TODO-POSTPUSH** - The workflow runs on GitHub once the lead pushes the repository, so this section is still empty. To fill it in:
+These are the real GitHub Actions results from the **first push of the repository**: commit `9856f93` ("Initial commit") on `main`, 2026-10-07, run [37668580592](https://github.com/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/37668580592) of "Session 17 - DevSecOps Pipeline". The workflow that ran is byte-identical to the one in the repo now:
 
 ```bash
-gh run list --workflow "Session 17 - DevSecOps Pipeline" --limit 5
-gh run watch <run-id>
-gh run view <run-id> --log | grep -E "Security gate|PASSED|successfully rolled out|Read-only file system"
+$ git show 9856f93:.github/workflows/session-17-devsecops.yml | cmp - .github/workflows/session-17-devsecops.yml && echo "identical"
+identical
 ```
 
-Screenshots to add to `screenshots/`:
+Nothing in this session's code changed after that commit either. Only README text was edited afterwards. Any later push that touches this folder or the workflow file triggers the workflow again, so newer runs will appear on the Actions page.
 
-- `03-actions-run-graph.png`: the job graph build-test -> sast / sca / secret-scan -> docker-build -> image-scan -> security-gate -> push-image -> deploy, all green
-- `04-actions-security-gate-summary.png`: the run summary with the "Security gate ... PASSED" table (the script writes it to `$GITHUB_STEP_SUMMARY`)
-- `05-actions-artifacts.png`: the artifacts (s17-test-reports, s17-reports-sast/sca/secrets/image, s17-image)
-- `06-actions-deploy-log.png`: the deploy job's rollout and the "Read-only file system" check
-- `07-ghcr-package.png`: the `s17-devsecops-demo` package on GHCR
+The public run page (headless Chrome, not signed in, 1280x1400):
+
+![GitHub Actions run 37668580592, all jobs green](screenshots/03-actions-run-37668580592.png)
+
+Run result and jobs (read-only `gh` calls):
+
+```bash
+$ gh run view 37668580592 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --json displayTitle,event,headSha,conclusion,createdAt,updatedAt,workflowName \
+    --jq '"\(.workflowName) | event=\(.event) | sha=\(.headSha[0:7]) | conclusion=\(.conclusion) | \(.createdAt) -> \(.updatedAt)"'
+Session 17 - DevSecOps Pipeline | event=push | sha=9856f93 | conclusion=success | 2026-10-07T18:40:07Z -> 2026-10-07T18:43:57Z
+$ gh run view 37668580592 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --json jobs \
+    --jq '.jobs[] | "\(.conclusion | ascii_upcase)  \(.name)  (\(((.completedAt|fromdate) - (.startedAt|fromdate)))s)"'
+SUCCESS  Build and unit test  (17s)
+SUCCESS  SAST (Bandit + Semgrep)  (30s)
+SUCCESS  Secret scan (gitleaks)  (13s)
+SUCCESS  SCA (pip-audit + Trivy fs)  (30s)
+SUCCESS  Docker build  (26s)
+SUCCESS  Container image scan (Trivy)  (31s)
+SUCCESS  Security gate  (8s)
+SUCCESS  Push image to GHCR  (21s)
+SUCCESS  Deploy to Kubernetes (kind)  (71s)
+```
+
+Key lines from the job logs (filtered with grep. The `...` lines mark where I cut echoed script lines):
+
+```bash
+$ gh run view 37668580592 -R vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA --log \
+  | perl -pe 's/(\e|\^\[)\[[0-9;]*m//g' \
+  | grep -E 'passed in|Required test coverage|No issues identified|Ran [0-9]+ rules|No known vulnerabilities|known vulnerabilities$|Detected config files|no leaks found|^Security gate\t.*\| (SAST|SCA|IaC|Secrets|Image): |Security gate \(|"status":"ok"|"app":"s17|\(alpine 3\.[0-9.]+\)|: digest: sha256|enforce=restricted|DEMO_API_KEY is not|successfully rolled out|pod/s17-devsecops-demo|uid=10001|touch /app/probe|(X-Content-Type|X-Frame|Content-Security)' \
+  | grep -vE '36;1m|##\[group\]|^\S+\s+\S+\s+\S+\s+echo ' \
+  | awk -F'\t' '{line=$3; for (i=4; i<=NF; i++) line=line " " $i; sub(/^[^ ]+ +/, "", line); print $1 " | " line}'
+Build and unit test | Required test coverage of 90% reached. Total coverage: 100.00%
+Build and unit test | ============================== 14 passed in 0.25s ==============================
+SAST (Bandit + Semgrep) | No issues identified.
+SAST (Bandit + Semgrep) | Ran 155 rules on 2 files: 0 findings.
+SAST (Bandit + Semgrep) | Security gate (sast): PASSED
+Secret scan (gitleaks) | 6:40PM INF no leaks found
+Secret scan (gitleaks) | Security gate (secrets): PASSED
+SCA (pip-audit + Trivy fs) | No known vulnerabilities found
+SCA (pip-audit + Trivy fs) | flask 3.1.3: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | werkzeug 3.1.9: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | gunicorn 26.2.0: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | blinker 1.9.0: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | click 8.5.0: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | itsdangerous 2.2.0: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | jinja2 3.1.6: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | markupsafe 3.0.4: 0 known vulnerabilities
+SCA (pip-audit + Trivy fs) | 2026-10-07T18:40:54Z INFO Detected config files num=4
+SCA (pip-audit + Trivy fs) | 2026-10-07T18:40:57Z INFO Detected config files num=4
+SCA (pip-audit + Trivy fs) | Security gate (sca): PASSED
+Docker build | {"status":"ok"}
+Docker build | {"api_key_configured":false,"app":"s17-devsecops-demo","git_sha":"9856f93","hostname":"25b0c4f5c031","python":"3.14.8","root_fs_writable":false,"uid":10001,"version":"1.0.0"}
+Docker build | X-Content-Type-Options: nosniff
+Container image scan (Trivy) | │ /src/s17-image.tar.gz (alpine 3.24.2)                                       │   alpine   │        0        │
+Security gate | | SAST: Bandit | bandit.json | 0 | 0 | PASS |
+Security gate | | SAST: Semgrep | semgrep.json | 0 | 0 | PASS |
+Security gate | | SCA: pip-audit | pip-audit.json | 0 | 0 | PASS |
+Security gate | | SCA: Trivy fs (dependencies) | trivy-fs.json | 0 | 0 | PASS |
+Security gate | | IaC: Trivy fs (misconfig) | trivy-fs.json | 0 | 0 | PASS |
+Security gate | | Secrets: gitleaks | gitleaks.json | 0 | 0 | PASS |
+Security gate | | Image: Trivy | trivy-image.json | 0 | 0 | PASS |
+Security gate | Security gate (sast sca secrets image): PASSED
+Push image to GHCR | sha-9856f93: digest: sha256:14458956374e5b6bad7a69ef491a54c6e35d4b1771fa1c66749622613c4453ca size: 1992
+Push image to GHCR | latest: digest: sha256:14458956374e5b6bad7a69ef491a54c6e35d4b1771fa1c66749622613c4453ca size: 1992
+Deploy to Kubernetes (kind) | s17-devsecops   Active   0s    kubernetes.io/metadata.name=s17-devsecops,pod-security.kubernetes.io/enforce-version=latest,pod-security.kubernetes.io/enforce=restricted,pod-security.kubernetes.io/warn=restricted
+...
+Deploy to Kubernetes (kind) | DEMO_API_KEY is not set - skipping. The app will report api_key_configured=false.
+Deploy to Kubernetes (kind) | deployment "s17-devsecops-demo" successfully rolled out
+...
+Deploy to Kubernetes (kind) | {"status":"ok"}
+Deploy to Kubernetes (kind) | {"api_key_configured":false,"app":"s17-devsecops-demo","git_sha":"9856f93","hostname":"s17-devsecops-demo-54bfd4f95f-5wsc9","python":"3.14.8","root_fs_writable":false,"uid":10001,"version":"1.0.0"}
+Deploy to Kubernetes (kind) | X-Content-Type-Options: nosniff
+Deploy to Kubernetes (kind) | X-Frame-Options: DENY
+Deploy to Kubernetes (kind) | Content-Security-Policy: default-src 'self'; frame-ancestors 'none'
+Deploy to Kubernetes (kind) | uid=10001(app) gid=10001(app) groups=10001(app)
+Deploy to Kubernetes (kind) | touch /app/probe -> touch: /app/probe: Read-only file system
+Deploy to Kubernetes (kind) | pod/s17-devsecops-demo-54bfd4f95f-5wsc9   1/1     Running   0          6s    10.244.0.6   s17-kind-control-plane   <none>           <none>
+Deploy to Kubernetes (kind) | pod/s17-devsecops-demo-54bfd4f95f-9mxv2   1/1     Running   0          6s    10.244.0.5   s17-kind-control-plane   <none>           <none>
+```
+
+Artifacts of the run:
+
+```bash
+$ gh api repos/vanshhhhhhhhh/DevOPS-ASSIGNMENT-VANSH-SRIVASTAVA/actions/runs/37668580592/artifacts --jq '.artifacts[] | "\(.name)  \(.size_in_bytes) bytes  expires \(.expires_at)"'
+s17-reports-sca  992 bytes  expires 2026-10-21T18:40:58Z
+s17-reports-secrets  145 bytes  expires 2026-10-21T18:40:40Z
+s17-reports-sast  994 bytes  expires 2026-10-21T18:40:57Z
+s17-test-reports  1322 bytes  expires 2026-10-21T18:40:25Z
+s17-reports-image  19138 bytes  expires 2026-10-21T18:42:01Z
+```
+
+What the run shows:
+
+- **Every stage passed in order:** 14 tests at 100% coverage, Bandit "No issues identified", Semgrep 155 rules and 0 findings, pip-audit 0 vulnerabilities for all 8 packages, Trivy fs on the 4 config files, gitleaks "no leaks found", and each stage gate `PASSED`.
+- **Image scan and gate:** Trivy found 0 vulnerabilities in the Alpine 3.24.2 image, and the final Security gate table is all `PASS` with `Security gate (sast sca secrets image): PASSED`. These are the same results as my local runs.
+- **Registry:** `push-image` pushed `ghcr.io/vanshhhhhhhhh/s17-devsecops-demo:sha-9856f93` and `latest`, both with digest `sha256:14458956...`.
+- **Deploy:** the namespace was created with `enforce=restricted`, the pods rolled out in kind, and the smoke test showed `uid 10001`, the security headers, and `touch /app/probe -> ... Read-only file system`. `api_key_configured:false` because the optional `DEMO_API_KEY` repository secret is not set.
+- **Artifacts:** the test, SAST, SCA, secrets and image reports (the image one includes the SBOM) are listed above. The image tarball artifact had a 3-day retention (workflow line 247) and has expired. Its upload is in the log: `Artifact s17-image has been successfully uploaded! Final size is 22427651 bytes.`
+- The run page shows a notice on every job: "The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026". Runs after that date will use the newer runner image. I have not tested the workflow on it.
 
 ## What I learned
 
