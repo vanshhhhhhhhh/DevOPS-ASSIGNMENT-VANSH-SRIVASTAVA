@@ -32,7 +32,7 @@ session-10-k8s-pods-replicasets-deployments/
     └── selector-mismatch.yaml    # Deployment whose selector does not match its template labels
 ```
 
-All YAML files except `client/curl-client.yaml` and `core-objects/statefulset.yaml` come from the course repository (Nency-Ravaliya/devops-heros, folder `session10-k8s-core-objects`). Each copied file starts with a two-line comment that names its source and any change I made.
+All YAML files except `client/curl-client.yaml` and `core-objects/statefulset.yaml` come from the course repository [Nency-Ravaliya/devops-heros](https://github.com/Nency-Ravaliya/devops-heros) (folder `session10-k8s-core-objects`). Each copied file starts with a two-line comment that names its source and any change I made.
 
 ## Environment
 
