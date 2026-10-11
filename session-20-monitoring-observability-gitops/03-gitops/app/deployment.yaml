@@ -25,7 +25,7 @@ spec:
           env:
             # the visible version string: change it in Git, push, and Argo CD rolls it out
             - name: APP_VERSION
-              value: "v1.0.0"
+              value: "v1.1.0"
             - name: POD_NAME
               valueFrom:
                 fieldRef:
