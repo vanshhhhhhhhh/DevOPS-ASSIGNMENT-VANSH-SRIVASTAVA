@@ -1,0 +1,16 @@
+# Safety net for generated files; each session folder also has its own .gitignore
+node_modules/
+dist/
+build/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.DS_Store
